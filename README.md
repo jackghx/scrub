@@ -1,3 +1,4 @@
+![CI](https://github.com/jackghx/scrub/actions/workflows/ci.yml/badge.svg)
 # Scrub, the local-first security-artefact sanitiser
 
 Strip infrastructure identifiers and secrets out of logs, configs, and terminal output
