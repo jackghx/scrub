@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* Dark, technical, calm. Cyan/purple on near-black. System font stacks only, no
+   CDN/Google fonts, so nothing phones home and there's no build-time font fetch. */
+@theme {
+  --color-bg: #0a0e14;
+  --color-panel: #0f141c;
+  --color-panel-2: #131a24;
+  --color-border: #1e2733;
+  --color-border-strong: #2b3947;
+  --color-ink: #e6edf3;
+  --color-muted: #8b98a9;
+  --color-faint: #5b6776;
+  --color-accent: #22d3ee;
+  --color-accent-2: #c084fc;
+  --color-warn: #fbbf24;
+  --color-warn-bg: #2a210a;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "JetBrains Mono", "SFMono-Regular",
+    "Consolas", "Liberation Mono", Menlo, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* subtle technical backdrop */
+  background-image: radial-gradient(
+      circle at 15% -10%,
+      rgba(34, 211, 238, 0.06),
+      transparent 40%
+    ),
+    radial-gradient(circle at 90% 0%, rgba(192, 132, 252, 0.06), transparent 35%);
+  background-attachment: fixed;
+}
+
+/* Monospace surfaces for artefacts. */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-ligatures: none;
+}
+
+/* Thin, dark scrollbars that fit the theme. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 6px;
+}
+
+/* Range slider, themed. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--color-border-strong);
+  outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-accent);
+  cursor: pointer;
+}

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+#
+# Scrub pre-commit hook, block a commit that contains unredacted secrets.
+#
+# It scans the *staged content* of each staged text file with `scrub --check`.
+# `scrub --check` exits non-zero when it finds a secret at/above its threshold, and
+# git aborts the commit when a pre-commit hook exits non-zero. That non-zero exit is
+# the whole mechanism.
+#
+# This is a safety net, NOT an enforcement boundary: it is bypassable with
+#   git commit --no-verify
+# and we say so on purpose. The report is masked, so secrets never hit your scrollback.
+#
+# Requires Scrub on PATH:  pip install -e .   (from the repo root)
+# Install into a repo:      hooks/install.sh   (or copy to .git/hooks/pre-commit)
+
+set -u
+
+if ! command -v scrub >/dev/null 2>&1; then
+  echo "scrub: pre-commit hook installed but the 'scrub' command is not on PATH." >&2
+  echo "       Install it with: pip install -e .   (then retry, or --no-verify to skip)" >&2
+  exit 1
+fi
+
+status=0
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  # Skip binary (and empty) blobs: `grep -I` reports no match for binary content.
+  if ! git show ":$f" | grep -Iq . ; then
+    continue
+  fi
+  # Scan the staged blob (not the working tree), labelled with the real path.
+  if ! git show ":$f" | scrub --check --label "$f" - ; then
+    status=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+if [ "$status" -ne 0 ]; then
+  echo "" >&2
+  echo "Scrub blocked this commit: possible secret(s) detected." >&2
+  echo "Review, redact, or bypass with 'git commit --no-verify' if you're certain." >&2
+fi
+
+exit "$status"

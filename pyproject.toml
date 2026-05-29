@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrub-sanitiser"
+version = "0.3.0"
+description = "Local-first security-artefact sanitiser, strip secrets and infra identifiers out of logs/configs before you share them."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Scrub" }]
+keywords = ["security", "redaction", "secrets", "pii", "pre-commit", "pseudonymisation"]
+# The detection pack is the only runtime dependency for the CLI / --check path.
+# fastapi/uvicorn are only needed for the API service (see the `api` extra), and
+# spaCy only for the optional full-Presidio mode (see scrub/README.md).
+dependencies = ["presidio-analyzer"]
+
+[project.optional-dependencies]
+api = ["fastapi", "uvicorn[standard]"]
+dev = ["pytest"]
+
+[project.scripts]
+# `pip install -e .` puts a `scrub` command on PATH -> scrub/cli.py:main().
+scrub = "scrub.cli:main"
+
+[tool.setuptools]
+# `scrub/` is the package. Its modules import each other flat (e.g.
+# `from scrubber import Scrubber`); cli.py bootstraps sys.path so that keeps working
+# whether invoked as the console script, via `python -m`, or under pytest, so the
+# detection/pseudonymisation modules need no edits.
+packages = ["scrub"]
+
+[tool.setuptools.package-data]
+scrub = ["sample.log"]

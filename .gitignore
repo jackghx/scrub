@@ -1,0 +1,40 @@
+# Scrub: never commit, these hold real secrets
+*.mapping.json
+scrubbed.txt
+restored.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Node / Next.js (ui/)
+node_modules/
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

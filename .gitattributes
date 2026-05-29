@@ -1,0 +1,8 @@
+# Force LF on the git hook and shell scripts. A pre-commit hook checked out with CRLF
+# line endings (the Windows default when core.autocrlf=true) can break on its shebang
+# line under many shells, and a broken pre-commit hook fails OPEN (it silently stops
+# running), which for a security control is the worst failure mode. These rules keep the
+# hook executable everywhere regardless of a contributor's autocrlf setting.
+hooks/pre-commit    text eol=lf
+hooks/install.sh    text eol=lf
+*.sh                text eol=lf

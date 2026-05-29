@@ -1,0 +1,14 @@
+# Detection layer
+presidio-analyzer
+
+# API service
+fastapi
+uvicorn[standard]
+
+# Tests
+pytest
+
+# Only needed for the OPTIONAL full-Presidio mode (built-in PII recognisers).
+# Default custom-recognisers-only mode does NOT require spaCy or a model.
+#   python -m spacy download en_core_web_lg
+spacy

@@ -1,0 +1,19 @@
+# Adopt Scrub via the `pre-commit` framework (https://pre-commit.com):
+#
+#   pip install -e .        # put `scrub` on PATH
+#   pip install pre-commit
+#   pre-commit install      # wire it into .git/hooks
+#
+# The framework runs hooks against the staged content and passes the staged file
+# paths, so `scrub --check <files>` scans exactly what is about to be committed.
+# Like the standalone hook, this is a bypassable safety net: `git commit --no-verify`.
+repos:
+  - repo: local
+    hooks:
+      - id: scrub-check
+        name: Scrub, block committed secrets
+        entry: scrub --check
+        language: system
+        # Only scan text files; binary blobs can't carry the patterns we detect.
+        types: [text]
+        pass_filenames: true
