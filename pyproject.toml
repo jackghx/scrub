@@ -14,7 +14,7 @@ keywords = ["security", "redaction", "secrets", "pii", "pre-commit", "pseudonymi
 # The detection pack is the only runtime dependency for the CLI / --check path.
 # fastapi/uvicorn are only needed for the API service (see the `api` extra), and
 # spaCy only for the optional full-Presidio mode (see scrub/README.md).
-dependencies = ["presidio-analyzer"]
+dependencies = ["presidio-analyzer", "click"]
 
 [project.optional-dependencies]
 api = ["fastapi", "uvicorn[standard]"]
