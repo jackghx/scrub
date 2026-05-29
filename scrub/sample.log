@@ -10,3 +10,19 @@
 2026-05-28T09:14:08Z [ERROR] api      upstream 10.10.10.2 timed out after 3 retries
 2026-05-28T09:14:08Z [ERROR] api      could not reach gateway 10.10.10.1
 2026-05-28T09:14:09Z [INFO ] api      retry succeeded via 10.10.10.2:8080
+2026-05-28T09:14:10Z [INFO ] llm      openai chat call api_key=sk-proj-AbCdEfGhIjKlMnOpQrStUvWxYz0123456789
+2026-05-28T09:14:11Z [INFO ] mailer   sendgrid api key SG.AbCdEfGhIjKlMnOpQrStUv.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_AbCdEf
+2026-05-28T09:14:12Z [INFO ] sms      twilio account sid AC0123456789abcdef0123456789abcdef
+2026-05-28T09:14:13Z [INFO ] bot      discord bot token MTIzNDU2Nzg5MDEyMzQ1Njc4OTA.GhIjKl.tokenexampleabcdefghijklmnopqrstuvwxyz
+2026-05-28T09:14:14Z [INFO ] push     firebase fcm server key AAAAbcdefgh:APA91bdGhpc0lzQUZha2VGY21TZXJ2ZXJLZXlCb2R5Rm9yU2FtcGxlZGhpc0lzQUZha2VGY21TZXJ2ZXJLZXlCb2R5Rm9yU2FtcGxlZGhpc0lz
+2026-05-28T09:14:15Z [DEBUG] deploy   provisioned authorized_keys ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDabcXYZ+/123def456 jack@workstation
+2026-05-28T09:14:16Z [WARN ] alerts   paging on-call ops-alerts@example.com about the outage
+2026-05-28T09:14:17Z [INFO ] ci       gitlab pipeline token glpat-AbCdEfGhIjKlMnOpQrSt
+2026-05-28T09:14:18Z [DEBUG] build    npm publish //registry.npmjs.org/:_authToken=npm_AbCdEfGhIjKlMnOpQrStUvWxYz0123456789
+2026-05-28T09:14:19Z [INFO ] shop     shopify admin api access token shpat_0123456789abcdef0123456789abcdef
+2026-05-28T09:14:20Z [INFO ] bot      telegram bot token 123456789:AAEhBtkfakeTelegramBotTokenExample0
+2026-05-28T09:14:21Z [INFO ] alerts   slack webhook https://hooks.slack.com/services/T00000000/B11111111/AbCdEfGhIjKlMnOpQrStUvWx
+2026-05-28T09:14:22Z [INFO ] alerts   discord webhook https://discord.com/api/webhooks/123456789012345678/AbCdEfGhIjKlMnOpQrStUvWxYz0123456789AbCdEfGhIjKlMnOpQrStUvWxYz012345
+2026-05-28T09:14:23Z [WARN ] deploy   fetching https://deploy:hunter2pass@artifacts.example.com/build/latest
+2026-05-28T09:14:24Z [WARN ] billing  refund issued to card 4111 1111 1111 1111 processed ok
+2026-05-28T09:14:25Z [DEBUG] api      bound ipv6 listener on 2606:4700:4700::1111 port 8080

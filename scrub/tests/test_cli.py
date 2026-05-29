@@ -11,7 +11,7 @@ import os
 
 import pytest
 
-from cli import main
+from cli import _Style, _render_table, main
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SAMPLE = os.path.join(ROOT, "sample.log")
@@ -151,3 +151,110 @@ def test_version(capsys):
     rc = main(["--version"])
     assert rc == 0
     assert capsys.readouterr().out.startswith("scrub ")
+
+
+# --- usability: no-input guard, colour, spinner -----------------------------
+
+
+class _TTYStringIO(io.StringIO):
+    """A stdin stand-in that reports itself as an interactive terminal."""
+
+    def isatty(self) -> bool:
+        return True
+
+
+def test_bare_command_with_tty_stdin_exits_2(capsys, monkeypatch):
+    # No file and an interactive terminal must NOT block on stdin: print usage,
+    # exit 2 (conventional usage error), and keep stdout clean.
+    monkeypatch.setattr("sys.stdin", _TTYStringIO(""))
+    rc = main([])
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert captured.out == ""
+    assert "usage" in captured.err.lower()
+    assert "--help" in captured.err
+
+
+def test_check_bare_with_tty_stdin_exits_2(capsys, monkeypatch):
+    monkeypatch.setattr("sys.stdin", _TTYStringIO(""))
+    rc = main(["--check"])
+    captured = capsys.readouterr()
+    assert rc == 2
+    assert captured.out == ""
+
+
+def test_piped_stdin_still_scrubs(capsys, monkeypatch):
+    # Non-TTY stdin (something piped in) keeps the original behaviour.
+    monkeypatch.setattr("sys.stdin", io.StringIO("gateway 10.10.10.1\n"))
+    rc = main([])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert out == "gateway <INTERNAL_IP_1>\n"
+
+
+def test_check_report_has_no_ansi_when_not_tty(capsys, tmp_path):
+    # Under capture, stderr is not a TTY, so the report must be plain.
+    f = tmp_path / "c.env"
+    f.write_text("aws_access_key_id=AKIAIOSFODNN7EXAMPLE\n", encoding="utf-8")
+    main(["--check", str(f)])
+    captured = capsys.readouterr()
+    assert "\x1b[" not in captured.err
+    assert "\x1b[" not in captured.out
+
+
+def test_no_color_flag_suppresses_ansi(capsys, tmp_path):
+    f = tmp_path / "c.env"
+    f.write_text("aws_access_key_id=AKIAIOSFODNN7EXAMPLE\n", encoding="utf-8")
+    main(["--check", "--no-color", str(f)])
+    captured = capsys.readouterr()
+    assert "\x1b[" not in captured.err
+    assert "\x1b[" not in captured.out
+
+
+def test_stdout_stays_plain_across_flags(capsys):
+    # stdout is sacred: never ANSI, never spinner carriage-returns, under any flag.
+    for argv in (
+        [SAMPLE],
+        [SAMPLE, "--no-color"],
+        [SAMPLE, "--quiet"],
+        [SAMPLE, "--threshold", "0"],
+    ):
+        rc = main(argv)
+        out = capsys.readouterr().out
+        assert rc == 0
+        assert "\x1b[" not in out
+        assert "\r" not in out
+
+
+def test_quiet_and_non_tty_suppress_spinner(capsys):
+    rc = main([SAMPLE, "--quiet"])
+    captured = capsys.readouterr()
+    assert rc == 0
+    # No spinner control characters or escapes leak into the captured report.
+    assert "\r" not in captured.err
+    assert "\x1b[" not in captured.err
+
+
+def test_style_disabled_is_identity():
+    s = _Style(False)
+    assert s.entity("AWS") == "AWS"
+    assert s.alert("blocked") == "blocked"
+
+
+def test_style_enabled_wraps_in_ansi():
+    s = _Style(True)
+    out = s.entity("AWS")
+    assert out.startswith("\x1b[")
+    assert out.endswith("\x1b[0m")
+    assert "AWS" in out
+
+
+def test_render_table_aligns_on_plain_text():
+    s = _Style(False)
+    rows = [
+        ("AWS_ACCESS_KEY", "AKIA****MPLE", "score=0.85", "f:2"),
+        ("IP", "10.*.1", "score=0.90", "f:5"),
+    ]
+    lines = _render_table(rows, s)
+    # The masked-value column starts at the same offset on every row.
+    assert lines[0].index("AKIA") == lines[1].index("10.")

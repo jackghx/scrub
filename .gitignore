@@ -38,3 +38,6 @@ out/
 Thumbs.db
 .idea/
 .vscode/
+
+# Electron/Chromium crashpad noise (e.g. desktop tooling run from the repo root)
+debug.log

@@ -174,6 +174,15 @@ scrub --restore m.json scrubbed.txt # reconstruct the original (byte-for-byte) -
 - **`--threshold/-t FLOAT`** (default **0.6**) only applies detections scoring ≥ the
   threshold. 0.6 is the high-confidence cut. Use **`-t 0`** to scrub everything (recall
   over precision) when you'd rather over-scrub than risk a miss.
+  - **Thresholds below 0.6 trade precision for recall, by design.** The deliberately
+    low-score, context-dependent recognisers (e.g. `AWS_SECRET_KEY` on any 40-char blob)
+    fire below that line, so an ambiguous high-entropy value can be *mislabelled* (tagged
+    `AWS_SECRET_KEY` when it's really some other key). It is still caught, just under the
+    wrong name. Specific high-score recognisers (OpenAI, SendGrid, Stripe, …) claim their
+    own values via overlap resolution, so well-known formats stay correctly labelled; the
+    residual mislabelling on truly generic blobs is the expected cost of running low, and
+    exactly why **review-before-export** exists, eyeball the detections before you trust
+    them.
 - **Context-aware in custom-only mode.** Some recognisers carry a deliberately low base
   score and rely on nearby *context words* to become confident, e.g. `AWS_SECRET_KEY`
   is 0.35 on its own (it matches any 40-char blob) but rises to 0.70 when `aws`/`secret`/
@@ -244,12 +253,38 @@ bypassable with `git commit --no-verify`, and it says so when it blocks you. It 
 ## Detected entity types
 
 `MAC_ADDRESS`, `INTERNAL_IP`, `PUBLIC_IP`, `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`,
-`AWS_ACCOUNT_ID`, `GITHUB_TOKEN`, `SLACK_TOKEN`, `GOOGLE_API_KEY`, `STRIPE_KEY`,
-`JWT`, `PRIVATE_KEY_BLOCK`, `BEARER_TOKEN`, `DB_CONNECTION_STRING`,
-`GENERIC_API_KEY`, `UNIX_HOME_PATH`, `HOSTNAME`.
+`AWS_ACCOUNT_ID`, `GITHUB_TOKEN`, `GITLAB_TOKEN`, `SLACK_TOKEN`, `SLACK_WEBHOOK`,
+`GOOGLE_API_KEY`, `STRIPE_KEY`, `OPENAI_KEY`, `SENDGRID_KEY`, `TWILIO_SID`,
+`DISCORD_TOKEN`, `DISCORD_WEBHOOK`, `FCM_SERVER_KEY`, `NPM_TOKEN`, `SHOPIFY_TOKEN`,
+`TELEGRAM_BOT_TOKEN`, `SSH_PUBLIC_KEY`, `EMAIL_ADDRESS`, `JWT`, `PRIVATE_KEY_BLOCK`,
+`BEARER_TOKEN`, `DB_CONNECTION_STRING`, `URL_WITH_CREDENTIALS`, `GENERIC_API_KEY`,
+`CREDIT_CARD`, `UNIX_HOME_PATH`, `HOSTNAME`.
 
-See `security_recognizers.py` for the patterns, scores, and context words. IPs are
-validated with the stdlib `ipaddress` module and split into internal vs public.
+See `security_recognizers.py` for the patterns, scores, and context words. IPs (v4 and
+v6) are validated with the stdlib `ipaddress` module and split into internal vs public;
+credit-card candidates are confirmed with the Luhn checksum, not trusted from the regex
+alone.
+
+## Known limitations
+
+Scrub is honest about what it is: a precision-tuned pattern-and-context detector with a
+human in the loop, **not** a guarantee.
+
+- **Detection is pattern + context based.** A bare secret *value* with no surrounding
+  context, at a low threshold (`< 0.6`), may be missed or mislabelled, e.g. an unfamiliar
+  40-char blob can match the deliberately low-score generic `AWS_SECRET_KEY` pattern and
+  be tagged as that even when it's something else. This is the deliberate
+  precision/recall tradeoff, and is exactly why **review-before-export** exists and why
+  the default threshold is **0.6**.
+- **It covers common, well-formatted secret types; it is not exhaustive.** Scrub
+  complements human review and a dedicated secrets-scanning suite, it does not replace
+  either. New or niche credential formats it doesn't have a recogniser for will pass
+  through untouched.
+- **Malformed or non-standard-format secrets may not match.** Recognisers are tuned to
+  the *real* shapes of each credential (correct length, prefix, and separators) to
+  preserve precision. A truncated, hand-edited, or otherwise off-format value can fall
+  through, loosening the patterns to catch those would flood ordinary text with false
+  positives, so we don't. Eyeball the detections and scrub anything the tool missed.
 
 ## Optional: full Presidio mode (built-in PII too)
 
@@ -283,14 +318,15 @@ cd scrub
 pytest
 ```
 
-The suite covers the recogniser pack (the original 19 cases, wired in via
-`tests/test_recognizers_pytest.py`), the pseudonymiser (consistency, distinct
+The suite covers the recogniser pack (45 isolation cases, wired into pytest via
+`tests/test_recognizers_pytest.py`, plus full-pipeline precedence/negative cases in
+`tests/test_recognizer_precedence.py`), the pseudonymiser (consistency, distinct
 indexing, overlap resolution, round-trip, passthrough, custom format), and the
 `Scrubber` end-to-end on `sample.log`. All tests run in custom-only mode, so **no
 spaCy model is needed to go green.**
 
-The original standalone recogniser harness is preserved verbatim and still runs on
-its own (prints the 19/19 table):
+The original standalone recogniser harness is preserved and still runs on
+its own (prints the 45/45 table):
 
 ```bash
 cd scrub

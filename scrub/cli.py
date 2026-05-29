@@ -33,9 +33,11 @@ Contract that keeps it pipeable and safe:
 from __future__ import annotations
 
 import argparse
+import itertools
 import json
 import os
 import sys
+import threading
 
 # --- flat-import bootstrap --------------------------------------------------
 # This package's modules import each other flat (``from scrubber import ...``).
@@ -88,6 +90,139 @@ def _reconfigure_std() -> None:
 def _err(*args: object) -> None:
     """Print a diagnostic to stderr (never stdout, keeps pipes clean)."""
     print("scrub:", *args, file=sys.stderr)
+
+
+# --- human-readable stderr presentation -------------------------------------
+# Colour and the progress spinner are STDERR-ONLY and strictly opt-in. stdout
+# carries scrubbed/restored text for pipes and must stay byte-for-byte plain, so
+# none of this ever touches it. Colour is suppressed when stderr is not a TTY,
+# when NO_COLOR is set, or with --no-color; the spinner additionally honours
+# --quiet. These guards are correctness, not polish: a redirected report or a
+# commit hook's captured output must contain no escape codes or spinner frames.
+
+
+def _color_enabled(no_color: bool) -> bool:
+    if no_color or "NO_COLOR" in os.environ:
+        return False
+    try:
+        return bool(sys.stderr.isatty())
+    except Exception:
+        return False
+
+
+class _Style:
+    """Minimal ANSI colouriser. Every method is the identity function when
+    disabled, so call sites never have to branch on whether colour is on."""
+
+    _RESET = "\033[0m"
+
+    def __init__(self, enabled: bool) -> None:
+        self.enabled = enabled
+
+    def _wrap(self, code: str, text: str) -> str:
+        return f"\033[{code}m{text}{self._RESET}" if self.enabled else text
+
+    def entity(self, t: str) -> str:
+        return self._wrap("36", t)  # cyan
+
+    def value(self, t: str) -> str:
+        return self._wrap("35", t)  # magenta
+
+    def score(self, t: str) -> str:
+        return self._wrap("2", t)  # dim
+
+    def location(self, t: str) -> str:
+        return self._wrap("90", t)  # grey
+
+    def note(self, t: str) -> str:
+        return self._wrap("33", t)  # amber
+
+    def alert(self, t: str) -> str:
+        return self._wrap("1;31", t)  # bold red
+
+
+def _render_table(rows, style: "_Style") -> list[str]:
+    """Align findings into columns: entity / masked value / score / location.
+
+    Column widths are measured on the PLAIN text before colour is applied, so
+    the zero-width ANSI escapes never skew the alignment. ``rows`` are
+    ``(entity, masked, score, location)`` tuples; the location column is dropped
+    entirely when no row has one.
+    """
+    w_ent = max(len(r[0]) for r in rows)
+    w_val = max(len(r[1]) for r in rows)
+    w_sc = max(len(r[2]) for r in rows)
+    has_loc = any(r[3] for r in rows)
+    lines = []
+    for entity, value, score, loc in rows:
+        cells = [style.entity(entity.ljust(w_ent)), style.value(value.ljust(w_val))]
+        if has_loc:
+            cells.append(style.score(score.ljust(w_sc)))
+            cells.append(style.location(loc))
+        else:
+            cells.append(style.score(score))
+        lines.append("  " + "  ".join(cells))
+    return lines
+
+
+def _spinner_enabled(no_color: bool, quiet: bool) -> bool:
+    if quiet:
+        return False
+    return _color_enabled(no_color)
+
+
+class _Progress:
+    """A tiny carriage-return spinner on stderr. Emits NOTHING when disabled,
+    which guarantees it can never pollute a pipe, a redirect, or a hook report.
+    Two-phase: a "Starting..." label while the analyzer is built, flipped to
+    "Scanning..." for the detection pass, so a slow run reads as honest work."""
+
+    _FRAMES = "|/-\\"
+
+    def __init__(self, enabled: bool, label: str = "Starting...") -> None:
+        self.enabled = enabled
+        self._label = label
+        self._stop = threading.Event()
+        self._thread: "threading.Thread | None" = None
+        self._maxlen = 0
+
+    def __enter__(self) -> "_Progress":
+        if self.enabled:
+            self._thread = threading.Thread(target=self._run, daemon=True)
+            self._thread.start()
+        return self
+
+    def set_label(self, label: str) -> None:
+        self._label = label
+
+    def _run(self) -> None:
+        for frame in itertools.cycle(self._FRAMES):
+            if self._stop.is_set():
+                break
+            line = f"{frame} {self._label}"
+            self._maxlen = max(self._maxlen, len(line))
+            sys.stderr.write("\r" + line)
+            sys.stderr.flush()
+            self._stop.wait(0.1)
+
+    def __exit__(self, *exc) -> bool:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join()
+        if self.enabled and self._maxlen:
+            # Wipe the spinner line so it leaves no trace before the report.
+            sys.stderr.write("\r" + " " * self._maxlen + "\r")
+            sys.stderr.flush()
+        return False
+
+
+def _no_input(parser: argparse.ArgumentParser) -> int:
+    """Bare invocation with an interactive terminal: print usage instead of
+    blocking forever on a stdin read no one is going to feed."""
+    _err("no input given and stdin is a terminal (nothing piped in).")
+    print(parser.format_usage().rstrip(), file=sys.stderr)
+    _err("pass a FILE, pipe text in, or run 'scrub --help' for full usage.")
+    return 2
 
 
 def mask(value: str, head: int = 4, tail: int = 4) -> str:
@@ -182,11 +317,22 @@ def _build_parser() -> argparse.ArgumentParser:
         help="(--check only) Don't print the non-blocking notice about sub-threshold "
         "detections on a passing commit. Exit codes are unaffected.",
     )
+    p.add_argument(
+        "--no-color",
+        action="store_true",
+        help="Disable coloured output. Colour is stderr-only and is already auto-"
+        "disabled when stderr is not a TTY or when the NO_COLOR env var is set.",
+    )
+    p.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress the progress indicator shown on slow interactive runs.",
+    )
     p.add_argument("-V", "--version", action="store_true", help="Print version and exit.")
     return p
 
 
-def _print_near_miss(subthreshold: list, threshold: float) -> None:
+def _print_near_miss(subthreshold: list, threshold: float, style: _Style) -> None:
     """Non-blocking notice (stderr, exit code unchanged) listing MASKED sub-threshold
     detections that were NOT blocked on a passing commit, so a borderline secret is
     visible rather than a silent false-confidence."""
@@ -198,16 +344,22 @@ def _print_near_miss(subthreshold: list, threshold: float) -> None:
             seen[key] = (entity, mask(original), score)
     rows = sorted(seen.values(), key=lambda r: r[2])
     lowest = min(r[2] for r in rows)
-    items = ", ".join(f"{e} {m} ({s:.2f})" for e, m, s in rows)
     plural = "s" if len(rows) != 1 else ""
     print(
-        f"scrub: note: commit allowed; {len(rows)} sub-threshold detection{plural} "
-        f"NOT blocked:",
+        style.note(
+            f"scrub: note: commit allowed; {len(rows)} sub-threshold "
+            f"detection{plural} NOT blocked:"
+        ),
         file=sys.stderr,
     )
-    print(f"  {items}.", file=sys.stderr)
+    table = [(e, m, f"score={s:.2f}", "") for e, m, s in rows]
+    for line in _render_table(table, style):
+        print(line, file=sys.stderr)
     print(
-        f"  Review if sensitive; re-run with --threshold {lowest:.2f} to block on these.",
+        style.note(
+            f"  Review if sensitive; re-run with --threshold {lowest:.2f} "
+            f"to block on these."
+        ),
         file=sys.stderr,
     )
 
@@ -218,6 +370,8 @@ def _run_check(
     allow: set[str],
     label: str,
     near_miss: bool = True,
+    style: _Style | None = None,
+    show_spinner: bool = False,
 ) -> int:
     """Scan files (or stdin) and report masked findings to stderr.
 
@@ -225,46 +379,57 @@ def _run_check(
     report. Exit 0 (pass) otherwise, and, unless ``near_miss`` is off, print a single
     non-blocking note about any sub-threshold detections that were *not* blocked.
     """
-    # Detect everything (threshold 0) so we can partition into blocking vs sub-threshold.
-    scrubber = Scrubber(score_threshold=0.0)
+    style = style or _Style(False)
     sources = files or ["-"]
-    blocking: list[tuple[str, int, str, str]] = []  # (label, line, entity, masked)
+    # (entity, masked, score, location) so the rows feed straight into _render_table.
+    blocking: list[tuple[str, str, str, str]] = []
     subthreshold: list[tuple[str, str, float]] = []  # (entity, original, score)
 
-    for path in sources:
-        try:
-            text = _read_text(path)
-        except OSError as exc:
-            _err(f"cannot read {path!r}: {exc.strerror or exc}")
-            return 2
-        name = label if path in (None, "-") else path
-        result = scrubber.scrub(text)
-        for det in result.detections:
-            if det["entity_type"] in allow:
-                continue
-            if det["score"] >= threshold:
-                line = text[: det["start"]].count("\n") + 1
-                blocking.append((name, line, det["entity_type"], mask(det["original"])))
-            else:
-                subthreshold.append(
-                    (det["entity_type"], det["original"], det["score"])
-                )
+    # Detect everything (threshold 0) so we can partition into blocking vs sub-threshold.
+    with _Progress(show_spinner, "Scanning...") as _p:
+        scrubber = Scrubber(score_threshold=0.0)
+        for path in sources:
+            try:
+                text = _read_text(path)
+            except OSError as exc:
+                _err(f"cannot read {path!r}: {exc.strerror or exc}")
+                return 2
+            name = label if path in (None, "-") else path
+            result = scrubber.scrub(text)
+            for det in result.detections:
+                if det["entity_type"] in allow:
+                    continue
+                if det["score"] >= threshold:
+                    line = text[: det["start"]].count("\n") + 1
+                    blocking.append(
+                        (
+                            det["entity_type"],
+                            mask(det["original"]),
+                            f"score={det['score']:.2f}",
+                            f"{name}:{line}",
+                        )
+                    )
+                else:
+                    subthreshold.append(
+                        (det["entity_type"], det["original"], det["score"])
+                    )
 
     if blocking:
         # Blocked: one clear message for this outcome, the blocking report only.
         plural = "s" if len(blocking) != 1 else ""
         _err(
-            f"--check: {len(blocking)} possible secret{plural} found "
-            f"(threshold {threshold}):"
+            style.alert(
+                f"--check: {len(blocking)} possible secret{plural} found "
+                f"(threshold {threshold}):"
+            )
         )
-        width = max(len(e) for _, _, e, _ in blocking)
-        for name, line, entity, masked in blocking:
-            print(f"  {name}:{line}  {entity:<{width}}  {masked}", file=sys.stderr)
+        for line in _render_table(blocking, style):
+            print(line, file=sys.stderr)
         return 1
 
     # Passed: optionally note (without blocking) any sub-threshold near-misses.
     if near_miss and subthreshold:
-        _print_near_miss(subthreshold, threshold)
+        _print_near_miss(subthreshold, threshold, style)
     return 0
 
 
@@ -287,7 +452,9 @@ def _run_restore(mapping_path: str, source: str | None) -> int:
     return 0
 
 
-def _warn_subthreshold(text: str, all_detections: list, threshold: float) -> None:
+def _warn_subthreshold(
+    text: str, all_detections: list, threshold: float, style: _Style
+) -> None:
     """Surface, don't silently drop. Print a MASKED stderr summary of detections that
     fell below the threshold and were therefore NOT scrubbed, so a real-but-low-
     confidence secret is visible rather than invisible (mirrors the UI's surface-
@@ -306,17 +473,29 @@ def _warn_subthreshold(text: str, all_detections: list, threshold: float) -> Non
     rows = sorted(seen.values(), key=lambda r: r[0])
     lowest = min(r[3] for r in rows)
     plural = "s" if len(rows) != 1 else ""
-    _err(f"{len(rows)} low-confidence detection{plural} NOT applied (score < {threshold}):")
-    width = max(len(r[1]) for r in rows)
-    for line, entity, masked, score in rows:
-        print(
-            f"  line {line}  {entity:<{width}}  {masked}  (score {round(score, 2)})",
-            file=sys.stderr,
+    _err(
+        style.note(
+            f"{len(rows)} low-confidence detection{plural} "
+            f"NOT applied (score < {threshold}):"
         )
-    _err(f"re-run with --threshold {lowest:.2f} to include them.")
+    )
+    table = [
+        (entity, masked, f"score={score:.2f}", f"line {line}")
+        for line, entity, masked, score in rows
+    ]
+    for line in _render_table(table, style):
+        print(line, file=sys.stderr)
+    _err(style.note(f"re-run with --threshold {lowest:.2f} to include them."))
 
 
-def _run_transform(source: str | None, threshold: float, mapping_path: str | None) -> int:
+def _run_transform(
+    source: str | None,
+    threshold: float,
+    mapping_path: str | None,
+    style: _Style | None = None,
+    show_spinner: bool = False,
+) -> int:
+    style = style or _Style(False)
     try:
         text = _read_text(source)
     except OSError as exc:
@@ -325,8 +504,10 @@ def _run_transform(source: str | None, threshold: float, mapping_path: str | Non
     # Detect everything once (threshold 0) so we can both produce the thresholded output
     # AND report what sits below the line. Detection is cheap (regex); correctness of
     # "never silently drop a secret" is worth the second pass.
-    all_detections = Scrubber(score_threshold=0.0).scrub(text).detections
-    result = Scrubber(score_threshold=threshold).scrub(text)
+    with _Progress(show_spinner) as _p:
+        all_detections = Scrubber(score_threshold=0.0).scrub(text).detections
+        _p.set_label("Scanning...")
+        result = Scrubber(score_threshold=threshold).scrub(text)
     if mapping_path:
         try:
             with open(mapping_path, "w", encoding="utf-8") as fh:
@@ -335,7 +516,7 @@ def _run_transform(source: str | None, threshold: float, mapping_path: str | Non
             _err(f"cannot write mapping {mapping_path!r}: {exc.strerror or exc}")
             return 2
     sys.stdout.write(result.scrubbed_text)
-    _warn_subthreshold(text, all_detections, threshold)
+    _warn_subthreshold(text, all_detections, threshold, style)
     return 0
 
 
@@ -353,6 +534,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     threshold = DEFAULT_THRESHOLD if args.threshold is None else args.threshold
+    style = _Style(_color_enabled(args.no_color))
+    show_spinner = _spinner_enabled(args.no_color, args.quiet)
 
     # --- mode validation (return 2 on misuse; keep main() return-code testable) ---
     if args.check and args.restore:
@@ -366,12 +549,18 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     if args.check:
+        # No files and an interactive terminal: print usage rather than block on
+        # a stdin read no one will feed.
+        if not args.files and sys.stdin.isatty():
+            return _no_input(parser)
         return _run_check(
             args.files,
             threshold,
             set(args.allow or []),
             args.label,
             near_miss=not args.no_near_miss,
+            style=style,
+            show_spinner=show_spinner,
         )
 
     # transform and restore take a single source (file or stdin).
@@ -380,9 +569,13 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     source = args.files[0] if args.files else None
 
+    # Bare command with an interactive terminal: don't hang waiting on stdin.
+    if source in (None, "-") and sys.stdin.isatty():
+        return _no_input(parser)
+
     if args.restore:
         return _run_restore(args.restore, source)
-    return _run_transform(source, threshold, args.mapping)
+    return _run_transform(source, threshold, args.mapping, style, show_spinner)
 
 
 if __name__ == "__main__":
