@@ -1,6 +1,5 @@
 # Detection layer
 presidio-analyzer
-click
 
 # API service
 fastapi
