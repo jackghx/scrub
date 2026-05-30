@@ -7,6 +7,11 @@ output before you share them in a GitHub issue, a support ticket, a forum, or a 
 post. It shows you what it found so you can review and adjust the result before copying
 it out.
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/3075d7b0-daa0-4606-97ce-50dd41205143" width="900" alt="Scrub review UI: original left, scrubbed output with coloured chips right, detections list visible">
+</p>
+
+
 > **The data never leaves your machine.** There are no network calls in the scrubbing
 > path and no telemetry. The API runs on `127.0.0.1`, and the UI's browser only ever
 > talks to that local API.
@@ -27,8 +32,13 @@ and correct what it flagged, so the tool applies its detections but leaves the f
 to you. The UI shows every detection and lets you toggle each one, and it never describes
 the output as "safe" or "clean". Check the result yourself before you share it.
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/44cfd40f-30af-4c32-805d-c1c945b11a32" width="900" alt="Detections list">
+</p>
+
 A dismissed detection is restored to its original value in the output and marked with an
 amber warning highlight, so anything you choose to keep in the clear is impossible to miss.
+
 
 ---
 
@@ -81,6 +91,11 @@ npm run dev
 detections, toggle anything you want to keep in the clear, and copy the result. Switch to
 the diff view to compare the original against the scrubbed output side by side.
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/98ba30d9-d5a3-4658-84ad-32f5746d2906" width="900" alt="Diff view">
+</p>
+
+
 > The UI talks only to `http://127.0.0.1:8000`; override with `NEXT_PUBLIC_SCRUB_API`.
 > Full UI behaviour, the toggle model, diff view, and production build, is documented in
 > [`ui/README.md`](ui/README.md).
@@ -111,6 +126,8 @@ report, warning, and error goes to a separate stream instead of mixing into that
 The mapping holds the real secrets, so it's written only to the `--mapping` file you name,
 never printed. The **full flag table** (`--threshold`, `--allow`, `--check`, and the rest)
 is in [`scrub/README.md`](scrub/README.md#cli-usage).
+
+
 
 ---
 
@@ -164,6 +181,10 @@ appear nearby.
 The current list is always available from the API (`GET /entities`) or
 `Scrubber().entities()`. You can also add your own regex recognisers at runtime from the
 review UI; they run alongside the built-in pack.
+
+<img width="1891" height="292" alt="image" src="https://github.com/user-attachments/assets/3d5ec0d1-9d20-49af-8778-2d4e709350ef" />
+<img width="1893" height="403" alt="image" src="https://github.com/user-attachments/assets/dbe25fe4-84a5-4cf1-b5e8-827cb302bd8a" />
+
 
 ---
 
