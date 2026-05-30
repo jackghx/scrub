@@ -1,102 +1,237 @@
-![CI](https://github.com/jackghx/scrub/actions/workflows/ci.yml/badge.svg)
-# Scrub, the local-first security-artefact sanitiser
+# Scrub, local-first security-artefact sanitiser
 
-Strip infrastructure identifiers and secrets out of logs, configs, and terminal output
-**before** you paste them into a public GitHub issue, a vendor ticket, a forum, or a
-blog post, and then **review what was detected and decide what to scrub** before you copy
-it out.
+**Strip secrets and infrastructure identifiers out of logs, configs, and terminal
+output before you share them, with a human review step so you decide what leaves
+your machine.**
 
-> **The data never leaves your machine.** That's the whole pitch, not a preference.
-> There are no network calls in the scrubbing path, no telemetry, no phone-home. The API
-> runs on `127.0.0.1`; the UI's browser talks only to that local API.
+Scrub runs entirely on your machine. Paste or pipe in an artefact; it detects
+internal IPs, hostnames, cloud keys, tokens, private keys, and connection strings,
+replaces each with a stable placeholder (e.g. `<INTERNAL_IP_1>`), and gives you a
+diff to review before anything is exported. Nothing is ever sent anywhere.
 
-Scrub is not a general PII tool. It targets what actually leaks in security work,
-internal IPs, hostnames, MACs, cloud keys, tokens, private keys, connection strings,
-and adds the piece general tools don't: **consistent, reversible pseudonymisation**
-(`<INTERNAL_IP_1>`), so the scrubbed artefact stays analytically useful and can be
-restored byte-for-byte.
+---
 
-## Human-in-the-loop, by design
+## Why
 
-Detection is **recall-favoured**, it surfaces everything, because under-scrubbing leaks
-a secret. That's only safe if a human can see and correct what was flagged. So Scrub
-**surfaces and applies; you decide**. The UI shows every detection, lets you toggle each
-one, and **never claims the output is "safe" or "clean"**. Always eyeball the result
-before sharing.
+Engineers leak secrets every day by pasting logs into GitHub issues, vendor
+tickets, forums, and chat. General PII tools target names and emails; they miss
+the things that actually leak in security and infrastructure work: internal IPs,
+MAC addresses, cloud keys, JWTs, private-key blocks, DB connection strings.
 
-## Three ways to use it
+Scrub fills that gap, and keeps a reversible mapping so the scrubbed artefact
+stays useful (you can follow which host talked to which) without exposing the real
+identifiers.
 
-| Dir | What | Stack |
-|-----|------|-------|
-| [`scrub/`](scrub) | The engine: detectors + consistent pseudonymiser + FastAPI service (`/scrub`, `/restore`, `/entities`, `/health`) **and the `scrub` CLI** | Python, Presidio |
-| [`ui/`](ui) | The review front end: two-pane paste → review → export, with per-detection toggles | Next.js, TypeScript, Tailwind |
-| [`hooks/`](hooks) | A git **pre-commit hook** that blocks commits containing secrets (built on `scrub --check`) | bash |
+---
 
-## Quick start (run both)
+## What it detects
 
-```bash
-# terminal 1 – the API (no spaCy model needed for the default mode)
-cd scrub
-python -m venv .venv && . .venv/Scripts/activate   # or: source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --host 127.0.0.1 --port 8000
+The detection pack ships **33 entity types**. Two are validated in code rather than
+trusted from a regex, IP addresses via the stdlib `ipaddress` module, and credit
+cards via the Luhn checksum, and several FP-prone patterns are deliberately scored
+low and only cross the threshold when supporting context words are nearby.
 
-# terminal 2 – the UI
-cd ui
-npm install
-npm run dev        # open http://localhost:3000
-```
+- **Network identifiers:** `INTERNAL_IP`, `PUBLIC_IP` (IPv4 + IPv6, validated),
+  `MAC_ADDRESS`, `HOSTNAME`
+- **Cloud / provider keys:** `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, `AWS_ACCOUNT_ID`,
+  `GOOGLE_API_KEY`, `STRIPE_KEY`, `OPENAI_KEY`, `OPENROUTER_KEY`,
+  `FCM_SERVER_KEY`, `SENDGRID_KEY`, `TWILIO_SID`
+- **Source-control / package tokens:** `GITHUB_TOKEN`, `GITLAB_TOKEN`,
+  `NPM_TOKEN`, `SHOPIFY_TOKEN`
+- **Chat tokens & webhooks:** `SLACK_TOKEN`, `SLACK_WEBHOOK`, `DISCORD_TOKEN`,
+  `DISCORD_WEBHOOK`, `TELEGRAM_BOT_TOKEN`
+- **Auth tokens / generic secrets:** `JWT`, `BEARER_TOKEN`, `GENERIC_API_KEY`
+- **Crypto / connection strings:** `PRIVATE_KEY_BLOCK` (PEM), `SSH_PUBLIC_KEY`,
+  `DB_CONNECTION_STRING`, `URL_WITH_CREDENTIALS`
+- **PII:** `EMAIL_ADDRESS`, `CREDIT_CARD` (Luhn-validated)
+- **Filesystem:** `UNIX_HOME_PATH` (username leak)
 
-Paste an artefact (try [`scrub/sample.log`](scrub/sample.log)), hit **Scrub**, review the
-colour-coded detections, toggle anything you want to keep in the clear, and copy the
-result. See [`scrub/README.md`](scrub/README.md) and [`ui/README.md`](ui/README.md) for
-details, the optional full-Presidio mode, and tests.
+The live list is always available from the API (`GET /entities`) or
+`Scrubber().entities()`. You can also add your own regex recognisers at runtime
+from the review UI (see below), they run alongside the built-in pack.
 
-## Command line + git pre-commit hook
+---
 
-Install the CLI (puts `scrub` on PATH):
+## Install
 
 ```bash
-pip install -e .          # from the repo root
+pip install -e .
 ```
+
+This puts a `scrub` command on your PATH. The only runtime dependency for the CLI
+is `presidio-analyzer`; the API service and full-Presidio mode are optional extras
+(`pip install -e ".[api]"`, and a spaCy model for full mode).
+
+---
+
+## CLI usage
 
 ```bash
 scrub app.log                      # scrubbed text -> stdout
-cat app.log | scrub                # pipeable
-scrub app.log --mapping m.json     # also save the reversible mapping (holds secrets)
-scrub --restore m.json scrubbed.txt   # reconstruct the original, byte-for-byte
-scrub --check app.log              # masked report -> stderr; exit 1 if secrets found
+scrub app.log --mapping m.json     # also save the reversible mapping
+cat app.log | scrub                # read stdin, scrub, write stdout
+scrub --restore m.json s.txt       # reconstruct the original
+scrub --check app.log              # report secrets (stderr); exit 1 if any
 ```
 
-**Block secrets at commit time.** The `scrub --check` mode exits non-zero when it finds
-a secret, which lets a git pre-commit hook abort the commit:
+| Flag | Mode | Meaning |
+| --- | --- | --- |
+| `FILE…` | all | Input file(s). Omit or use `-` to read stdin. Multiple files are only meaningful with `--check`. |
+| `--check` | check | Detection only: print a masked report to stderr, exit 1 if any finding is at/above the threshold, else 0. Built for pre-commit hooks. |
+| `--restore MAPPING.json` | restore | Reconstruct the original from scrubbed input + this mapping. |
+| `--mapping PATH` | transform | Also write the reversible `{placeholder: original}` mapping as JSON to `PATH`. |
+| `-t`, `--threshold N` | transform / check | Only act on detections scoring ≥ N (default `0.6`; use `0` to scrub everything, recall over precision). |
+| `--allow ENTITY_TYPE` | check | Suppress an entity type, e.g. `--allow PUBLIC_IP`. Repeatable. |
+| `--label NAME` | check | Name to use for stdin in the report (default `<stdin>`). |
+| `--no-near-miss` | check | Don't print the non-blocking notice about sub-threshold detections on a passing commit. |
+| `--no-color` | all | Disable coloured output (colour is stderr-only and already auto-off when stderr isn't a TTY or `NO_COLOR` is set). |
+| `--quiet` | all | Suppress the progress spinner on slow interactive runs. |
+| `-V`, `--version` | n/a | Print version and exit. |
+
+Running `scrub` with no input and an interactive terminal prints usage and exits 2
+(it won't hang waiting on stdin).
+
+The contract that keeps it pipeable and safe:
+
+- Scrubbed / restored text is the **only** thing on **stdout**.
+- Diagnostics, reports, and errors go to **stderr**, including a masked summary of
+  low-confidence detections that were *not* applied, so nothing is silently dropped.
+- The reversible mapping holds the real secrets, so it is written **only** to the
+  `--mapping` path you ask for, never to stdout.
+- `--check` and every report **mask** each value, so secrets never hit your
+  scrollback or CI logs.
+
+---
+
+## Git pre-commit hook
+
+`--check` is designed to drop into a git pre-commit hook so secrets are caught
+before they are committed. A ready-made hook and installers live in
+[`hooks/`](hooks/):
 
 ```bash
-./hooks/install.sh        # copies hooks/pre-commit into this repo's .git/hooks
+hooks/install.sh        # bash / macOS / Linux
+hooks/install.ps1       # Windows PowerShell
 ```
 
-…or, for [pre-commit](https://pre-commit.com) framework users, the repo ships a
-[`.pre-commit-config.yaml`](.pre-commit-config.yaml) (`pre-commit install`). Reports are
-**masked** so secrets never hit your scrollback, and the hook is an honest safety net which is
-bypassable with `git commit --no-verify`. Full CLI + hook docs in
-[`scrub/README.md`](scrub/README.md).
+The hook blocks a commit (exit 1) on any high-confidence finding and prints a
+masked report; sub-threshold near-misses are noted without blocking.
 
-## Security & CI
+---
 
-Dependency advisories are triaged and documented in [`SECURITY.md`](SECURITY.md) (a
-security tool shouldn't ship untriaged vulns), and [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-runs the Python tests, the UI build/type-check, and a dependency audit gated at `high` on
-every push and PR.
+## The review UI
 
-## No persistence of secrets
+A local web UI (Next.js) for the paste → review → export flow:
 
-The mapping that reverses a scrub holds the real secrets. It is returned by the API for
-the caller to hold and is kept **in memory only** in the UI. It is never written to disk,
-`localStorage`, or anywhere else. The repo's `.gitignore` also excludes
-`*.mapping.json`. Treat any mapping you do save like the credentials it contains.
+```bash
+cd ui
+npm install
+npm run dev   # http://localhost:3000
+```
 
-## Roadmap (not built yet)
+It talks only to the local API (`http://127.0.0.1:8000`); start that with:
 
-Format-preserving pseudonymisation (fake-but-valid IP/MAC), an encrypted vault for the
-mapping at rest, and screenshot OCR + visual redaction. Any future LLM recogniser must be
-a **local** model (e.g. Ollama) and opt-in, the local-first promise is non-negotiable.
+```bash
+cd scrub
+uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+What the UI gives you:
+
+- **Paste or load files:** drag-and-drop or pick multiple files; each opens in its
+  own tab. Files are read in the browser; only the text reaches the localhost API.
+- **Review with line numbers:** the scrubbed output is line-numbered; click a
+  detection to scroll to and highlight that line. A gutter "minimap" shows where in
+  the artefact data was scrubbed.
+- **Diff view:** toggle to see the original (with highlights) beside the scrubbed
+  output.
+- **Per-detection control:** keep/dismiss individual detections, filter/search the
+  list, and move a confidence-threshold slider; the export updates instantly.
+- **Custom recognisers:** add your own regex patterns at runtime (in memory only).
+- **Restore round-trip:** reconstruct the original from the in-memory mapping to
+  confirm the scrub is reversible.
+
+API endpoints (all localhost-only): `POST /scrub`, `POST /restore`,
+`GET /entities`, `GET /health`, and `GET/POST/DELETE /recognizers` for the custom
+recogniser set.
+
+---
+
+## How it works
+
+- **Stable, reversible pseudonymisation.** Every occurrence of the same value gets
+  the same placeholder, so the scrubbed artefact still reads as a coherent trace;
+  the kept mapping reconstructs the original byte-for-byte.
+- **Context-aware scoring.** In the default (custom-pack-only, no-spaCy) mode, a
+  lightweight character-window check raises a detection's score when the
+  recogniser's context words are nearby, so a real AWS secret next to
+  `aws_secret_access_key` clears the threshold while a bare 40-char blob does not.
+- **Validated, not just matched.** IPs and credit-card numbers are validated in
+  code (stdlib `ipaddress`, Luhn) rather than trusted from a regex.
+- **Local-first.** No network calls in the scrub path; no telemetry.
+
+---
+
+## Optional: full Presidio mode
+
+The default mode runs the custom pack only, no spaCy model needed. To also get
+Presidio's built-in human-PII recognisers (`PERSON`, etc.) on top:
+
+```bash
+python -m spacy download en_core_web_lg
+```
+
+```python
+Scrubber(use_nlp_engine=True)          # security pack + built-in PII
+```
+
+For the API, set `SCRUB_USE_NLP=1` before launching `uvicorn`. If the model isn't
+installed, Scrub fails fast with the exact `spacy download` command, it never
+silently degrades.
+
+---
+
+## Architecture
+
+- **`security_recognizers.py`:** the detection pack (Presidio recognisers +
+  validated IP/credit-card logic).
+- **`pseudonymizer.py`:** turns detections into stable placeholders and back.
+- **`scrubber.py`:** ties detection + pseudonymisation behind one `Scrubber`
+  class, and holds any runtime custom recognisers.
+- **`context_enhancer.py`:** spaCy-free context scoring for custom-only mode.
+- **`cli.py`:** the command-line interface.
+- **`main.py`:** the localhost API used by the review UI.
+- **`ui/`:** the Next.js review UI.
+
+---
+
+## Known limitations
+
+- Detection is **pattern + context based**, not semantic. Novel, obfuscated, or
+  malformed secrets may not match, by design, the pack favours precision on the
+  high-confidence patterns and leans on context for the ambiguous ones.
+- At low thresholds, bare values can be mislabelled (the long tail favours recall);
+  raise `--threshold`, or use the review step, to tighten this.
+- The pack is **not exhaustive:** it targets the identifiers that actually leak in
+  security/infra work, not every possible secret format.
+- **Review before export is the safety net.** Scrub surfaces what it found (and what
+  it nearly found); a human still decides what is safe to share.
+
+---
+
+## Testing
+
+```bash
+cd scrub && pytest
+```
+
+---
+
+## License
+
+MIT
+
+---
+
+*This README reflects scrub v0.3.0. The detected-entity list and CLI flags are the
+two things most likely to drift; keep this section honest as recognisers are added.*

@@ -36,6 +36,7 @@ export const ENTITY_META: Record<string, EntityMeta> = {
   JWT: { color: "#a3e635", label: "JWT" },
   BEARER_TOKEN: { color: "#facc15", label: "Bearer token" },
   GENERIC_API_KEY: { color: "#bef264", label: "Generic key/secret" },
+  OPENROUTER_KEY: { color: "#fde047", label: "OpenRouter key" },
 
   // crypto + DB (highest-risk tier)
   PRIVATE_KEY_BLOCK: { color: "#fb7185", label: "Private key block" },

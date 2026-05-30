@@ -8,7 +8,7 @@
 // These functions are deliberately free of React so they can be reasoned about and
 // unit-tested in isolation.
 
-import type { Detection, Group, Token } from "./types";
+import type { Detection, Group, OriginalToken, Token } from "./types";
 
 /** Detections at or above this score are kept (checked) by default. Below it they
  *  surface unchecked, the ambiguous long-tail (HOSTNAME, AWS_ACCOUNT_ID, AWS secret
@@ -123,6 +123,161 @@ export function buildTokens(
     tokens.push({ type: "text", text: original.slice(cursor) });
   }
   return tokens;
+}
+
+/** A piece of a single rendered line in the scrubbed output. */
+export type ScrubbedPiece =
+  | { type: "text"; text: string }
+  | { type: "chip"; placeholder: string; entity: string }
+  | { type: "restored"; text: string; entity: string };
+
+/** Split scrubbed tokens into lines (arrays of pieces) so the review can render a
+ *  line-number gutter. Newlines only ever live in text/restored tokens; a chip
+ *  (placeholder) never contains one. The line index here matches the numbering used
+ *  by outputLines() and scrubMarks(). */
+export function tokenLines(tokens: Token[]): ScrubbedPiece[][] {
+  const lines: ScrubbedPiece[][] = [[]];
+  const addText = (text: string, make: (s: string) => ScrubbedPiece) => {
+    const parts = text.split("\n");
+    parts.forEach((part, i) => {
+      if (i > 0) lines.push([]);
+      if (part.length > 0) lines[lines.length - 1].push(make(part));
+    });
+  };
+  for (const t of tokens) {
+    if (t.type === "text") addText(t.text, (s) => ({ type: "text", text: s }));
+    else if (t.type === "chip")
+      lines[lines.length - 1].push({
+        type: "chip",
+        placeholder: t.placeholder,
+        entity: t.entity,
+      });
+    else addText(t.text, (s) => ({ type: "restored", text: s, entity: t.entity }));
+  }
+  return lines;
+}
+
+/** A piece of a single rendered line in the original ("before") panel. */
+export type OriginalPiece =
+  | { type: "text"; text: string }
+  | { type: "highlight"; text: string; entity: string; kept: boolean };
+
+/** Split original-text tokens into lines for the diff "before" panel's gutter. A
+ *  highlighted span (e.g. a multi-line PEM block) can itself wrap several lines. */
+export function originalTokenLines(tokens: OriginalToken[]): OriginalPiece[][] {
+  const lines: OriginalPiece[][] = [[]];
+  const addText = (text: string, make: (s: string) => OriginalPiece) => {
+    const parts = text.split("\n");
+    parts.forEach((part, i) => {
+      if (i > 0) lines.push([]);
+      if (part.length > 0) lines[lines.length - 1].push(make(part));
+    });
+  };
+  for (const t of tokens) {
+    if (t.type === "text") addText(t.text, (s) => ({ type: "text", text: s }));
+    else
+      addText(t.text, (s) => ({
+        type: "highlight",
+        text: s,
+        entity: t.entity,
+        kept: t.kept,
+      }));
+  }
+  return lines;
+}
+
+/** Tokenise the ORIGINAL text for the diff "before" panel: plain text with every
+ *  detected span highlighted, tagged with whether it will be scrubbed (kept) or left
+ *  exposed (dismissed) so the panel can colour them differently. */
+export function buildOriginalTokens(
+  original: string,
+  groups: Group[],
+  kept: Record<string, boolean>,
+): OriginalToken[] {
+  const tokens: OriginalToken[] = [];
+  let cursor = 0;
+  for (const span of flatSpans(groups)) {
+    if (span.start > cursor) {
+      tokens.push({ type: "text", text: original.slice(cursor, span.start) });
+    }
+    tokens.push({
+      type: "highlight",
+      text: original.slice(span.start, span.end),
+      entity: span.entity,
+      placeholder: span.placeholder,
+      kept: !!kept[span.placeholder],
+    });
+    cursor = span.end;
+  }
+  if (cursor < original.length) {
+    tokens.push({ type: "text", text: original.slice(cursor) });
+  }
+  return tokens;
+}
+
+/** A scrubbed-position marker for the review minimap. ``line`` is the 0-based line in
+ *  the EXPORT output where this placeholder lands, so a vertical gutter can show, at a
+ *  glance, where in a long artefact data was scrubbed. */
+export interface ScrubMark {
+  placeholder: string;
+  entity: string;
+  line: number;
+}
+
+/** Locate every KEPT placeholder by its line in the export output. Dismissed spans
+ *  aren't marked (nothing was scrubbed there). Numbering follows the OUTPUT: a
+ *  multi-line secret collapsed to a one-line placeholder shifts later lines up,
+ *  exactly as the rendered scrubbed text does. */
+export function scrubMarks(
+  original: string,
+  groups: Group[],
+  kept: Record<string, boolean>,
+): { marks: ScrubMark[]; totalLines: number } {
+  const marks: ScrubMark[] = [];
+  let cursor = 0;
+  let line = 0;
+  const countNewlines = (s: string) => {
+    for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 10) line += 1;
+  };
+  for (const span of flatSpans(groups)) {
+    countNewlines(original.slice(cursor, span.start));
+    if (kept[span.placeholder]) {
+      marks.push({ placeholder: span.placeholder, entity: span.entity, line });
+      // Placeholders are single-line, so they add no newlines to the output.
+    } else {
+      countNewlines(original.slice(span.start, span.end));
+    }
+    cursor = span.end;
+  }
+  countNewlines(original.slice(cursor));
+  return { marks, totalLines: line + 1 };
+}
+
+/** The 0-based line in the EXPORT output where each group's first occurrence lands,
+ *  keyed by placeholder. Matches the line numbering you'd see scrolling the scrubbed
+ *  pane, so the detections list and "locate" jump to the same place. Covers both kept
+ *  (placeholder) and dismissed (exposed original) groups. */
+export function outputLines(
+  original: string,
+  groups: Group[],
+  kept: Record<string, boolean>,
+): Record<string, number> {
+  const result: Record<string, number> = {};
+  let cursor = 0;
+  let line = 0;
+  const countNewlines = (s: string) => {
+    for (let i = 0; i < s.length; i++) if (s.charCodeAt(i) === 10) line += 1;
+  };
+  for (const span of flatSpans(groups)) {
+    countNewlines(original.slice(cursor, span.start));
+    if (!(span.placeholder in result)) result[span.placeholder] = line;
+    if (!kept[span.placeholder]) {
+      // Dismissed: the multi-line original stays in the output, shifting later lines.
+      countNewlines(original.slice(span.start, span.end));
+    }
+    cursor = span.end;
+  }
+  return result;
 }
 
 /** The exact plain-text export for the current toggle state: kept → placeholder,

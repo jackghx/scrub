@@ -420,6 +420,35 @@ class OpenAiKeyRecognizer(PatternRecognizer):
         )
 
 
+class OpenRouterKeyRecognizer(PatternRecognizer):
+    """OpenRouter API keys: ``sk-or-v1-`` + a long alphanumeric body.
+
+    The ``-or-v1-`` infix (with hyphens) means the generic OpenAI ``sk-`` patterns
+    never match these, the hyphen breaks ``sk-[A-Za-z0-9]{40,}``, so they need their
+    own recogniser. The long, near-unique ``sk-or-v1-`` prefix is what provides the
+    precision (false positives are effectively nil), so the body is matched as bounded
+    alphanumerics rather than fixed-length hex: real keys are hex and are still caught,
+    and the recogniser is robust to length/charset variants without losing precision.
+    The bound (40-100) keeps a pathological long line from being swallowed whole.
+    """
+
+    PATTERNS = [
+        Pattern(
+            name="openrouter_key",
+            regex=r"\bsk-or-v1-[A-Za-z0-9]{40,100}\b",
+            score=0.95,
+        ),
+    ]
+    CONTEXT = ["openrouter", "api", "key"]
+
+    def __init__(self):
+        super().__init__(
+            supported_entity="OPENROUTER_KEY",
+            patterns=self.PATTERNS,
+            context=self.CONTEXT,
+        )
+
+
 class DiscordTokenRecognizer(PatternRecognizer):
     """Discord bot tokens: ``<base64 id>.<base64 ts>.<base64 hmac>``.
 
@@ -887,6 +916,7 @@ _PATTERN_RECOGNIZERS = [
     UnixHomePathRecognizer,
     HostnameRecognizer,
     OpenAiKeyRecognizer,
+    OpenRouterKeyRecognizer,
     DiscordTokenRecognizer,
     FcmServerKeyRecognizer,
     TwilioSidRecognizer,

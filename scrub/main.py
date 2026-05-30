@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 from typing import Any, Dict, List
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -89,6 +89,23 @@ class RestoreResponse(BaseModel):
     original: str
 
 
+class CustomRecognizer(BaseModel):
+    entity: str
+    label: str
+    regex: str
+    score: float
+    context: List[str]
+
+
+class CustomRecognizerRequest(BaseModel):
+    label: str = Field(..., description="Human label, e.g. 'Employee ID'.")
+    regex: str = Field(..., description="The pattern to match (Python regex).")
+    score: float = Field(0.6, ge=0.0, le=1.0, description="Base confidence 0-1.")
+    context: List[str] = Field(
+        default_factory=list, description="Words that, if nearby, raise confidence."
+    )
+
+
 # --- endpoints --------------------------------------------------------------
 
 
@@ -114,6 +131,32 @@ def restore(req: RestoreRequest) -> Dict[str, str]:
 def entities() -> Dict[str, List[str]]:
     """The entity types the security pack can produce."""
     return {"entities": scrubber.entities()}
+
+
+@app.get("/recognizers")
+def list_recognizers() -> Dict[str, List[Dict[str, Any]]]:
+    """The user-defined custom recognisers currently registered (in memory only)."""
+    return {"recognizers": scrubber.custom_recognizers()}
+
+
+@app.post("/recognizers")
+def add_recognizer(req: CustomRecognizerRequest) -> Dict[str, Any]:
+    """Register a custom regex recogniser. 400 if the pattern is invalid."""
+    try:
+        definition = scrubber.add_custom_recognizer(
+            label=req.label, regex=req.regex, score=req.score, context=req.context
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"recognizer": definition, "recognizers": scrubber.custom_recognizers()}
+
+
+@app.delete("/recognizers/{entity}")
+def delete_recognizer(entity: str) -> Dict[str, Any]:
+    """Remove a custom recogniser by its entity token. 404 if it isn't registered."""
+    if not scrubber.remove_custom_recognizer(entity):
+        raise HTTPException(status_code=404, detail=f"No custom recogniser '{entity}'.")
+    return {"recognizers": scrubber.custom_recognizers()}
 
 
 @app.get("/health")

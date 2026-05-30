@@ -41,7 +41,7 @@ export function RestorePanel({ mapping, exportText }: RestorePanelProps) {
         <span className="text-sm font-semibold tracking-wide text-[var(--color-ink)]">
           Restore (round-trip check)
         </span>
-        <span className="text-xs text-[var(--color-faint)]">{open ? "▲" : "▼"}</span>
+        <span className="text-xs text-[var(--color-faint)]">{open ? "Hide" : "Show"}</span>
       </button>
 
       {open && (
@@ -53,7 +53,7 @@ export function RestorePanel({ mapping, exportText }: RestorePanelProps) {
               The mapping is kept in memory only, never written to disk, localStorage,
               or anywhere else.
             </span>{" "}
-            It holds the real secrets; it dies when you reload.
+            It is discarded when you reload the page.
           </p>
 
           <button
@@ -61,7 +61,7 @@ export function RestorePanel({ mapping, exportText }: RestorePanelProps) {
             disabled={!hasMapping || busy}
             className="rounded-md border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] transition-colors hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {busy ? "Restoring…" : "Restore from current output"}
+            {busy ? "Restoring..." : "Restore from current output"}
           </button>
 
           {!hasMapping && (

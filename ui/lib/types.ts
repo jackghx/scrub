@@ -27,6 +27,16 @@ export interface HealthResponse {
   mode: string;
 }
 
+/** A user-defined recogniser, mirroring scrub/main.py's CustomRecognizer. The raw
+ *  pattern + label live in memory on the local API only; nothing is persisted. */
+export interface CustomRecognizer {
+  entity: string;
+  label: string;
+  regex: string;
+  score: number;
+  context: string[];
+}
+
 /** Detections grouped by placeholder (one per unique value) for the review list. */
 export interface Group {
   placeholder: string;
@@ -44,3 +54,8 @@ export type Token =
   | { type: "text"; text: string }
   | { type: "chip"; placeholder: string; entity: string }
   | { type: "restored"; text: string; entity: string };
+
+/** A rendered fragment for the diff "before" panel — original text with highlights. */
+export type OriginalToken =
+  | { type: "text"; text: string }
+  | { type: "highlight"; text: string; entity: string; placeholder: string; kept: boolean };

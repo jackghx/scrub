@@ -75,5 +75,6 @@ def test_entities_listed(scrubber):
     ents = scrubber.entities()
     assert "INTERNAL_IP" in ents and "PUBLIC_IP" in ents
     assert "PRIVATE_KEY_BLOCK" in ents
-    # the pack advertises 32 entity types (derived from the recogniser list)
-    assert len(ents) == 32
+    assert "OPENROUTER_KEY" in ents
+    # the pack advertises 33 entity types (derived from the recogniser list)
+    assert len(ents) == 33

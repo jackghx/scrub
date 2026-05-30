@@ -15,6 +15,11 @@ how each was handled, states the threat model, and explains how to report a prob
   in the Python core (`scrub/`), the CLI, the `--check` scanner, or the review UI's
   scrubbing flow. No telemetry, no analytics, no "phone home". The browser UI talks only
   to the local API; CORS is restricted to `127.0.0.1:3000` / `localhost:3000`.
+- **Custom recognisers stay local and in-memory.** The API's `/recognizers` endpoints
+  let the UI register user-supplied regex recognisers at runtime. These are held in
+  memory only (never persisted, gone on restart) and the regex is compiled on the
+  local, single-user service, a pathological pattern is a self-inflicted local cost,
+  not a remote-exploitable surface, since the API is localhost-bound and CORS-locked.
 - **Secrets are never emitted unmasked.** The CLI writes the reversible mapping (which
   contains the real secrets) only to the path you pass via `--mapping`, never to stdout.
   The `--check` scanner and the git pre-commit hook mask every value in their reports so

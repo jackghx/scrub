@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-/* Dark, technical, calm. Cyan/purple on near-black. System font stacks only, no
-   CDN/Google fonts, so nothing phones home and there's no build-time font fetch. */
+/* System font stacks only, no CDN/Google fonts, so nothing phones home and there's
+   no build-time font fetch. */
 @theme {
   --color-bg: #0a0e14;
   --color-panel: #0f141c;
@@ -31,14 +31,6 @@ body {
   background-color: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  /* subtle technical backdrop */
-  background-image: radial-gradient(
-      circle at 15% -10%,
-      rgba(34, 211, 238, 0.06),
-      transparent 40%
-    ),
-    radial-gradient(circle at 90% 0%, rgba(192, 132, 252, 0.06), transparent 35%);
-  background-attachment: fixed;
 }
 
 /* Monospace surfaces for artefacts. */
@@ -78,7 +70,6 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 50%;
   background: var(--color-accent);
   cursor: pointer;
-  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.18);
 }
 input[type="range"]::-moz-range-thumb {
   width: 16px;

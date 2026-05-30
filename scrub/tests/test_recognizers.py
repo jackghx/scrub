@@ -35,6 +35,7 @@ CASES = [
     ("Google key (valid)", "key=AIzaSyB" + "C" * 32,                    "GOOGLE_API_KEY",       True),
     ("OpenAI project key", "sk-proj-" + "A" * 48 + "T3BlbkFJ" + "B" * 20, "OPENAI_KEY",         True),
     ("OpenAI legacy key",  "sk-" + "A" * 48,                            "OPENAI_KEY",           True),
+    ("OpenRouter key",     "sk-or-v1-" + "a1b2c3d4" * 8,                "OPENROUTER_KEY",       True),
     ("Discord bot token",  "MTIzNDU2Nzg5MDEyMzQ1Njc4OTA.GhIjKl." + "a" * 38, "DISCORD_TOKEN",   True),
     ("FCM server key",     "AAAAbcdefgh:APA91b" + "X" * 130,            "FCM_SERVER_KEY",       True),
     ("Twilio account SID", "AC" + "0123456789abcdef" * 2,               "TWILIO_SID",           True),

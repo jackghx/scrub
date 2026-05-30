@@ -27,7 +27,10 @@ constraint, not a preference.
 
 from __future__ import annotations
 
-from typing import List
+import re
+from typing import Dict, List
+
+from presidio_analyzer import Pattern, PatternRecognizer
 
 from context_enhancer import enhance_with_context
 from pseudonymizer import ScrubResult, pseudonymize, restore
@@ -38,6 +41,13 @@ from security_recognizers import (
 )
 
 DEFAULT_MODEL = "en_core_web_lg"
+
+
+def _normalise_entity(label: str) -> str:
+    """Turn a user-supplied entity label into a clean placeholder token, e.g.
+    'Employee ID' -> 'EMPLOYEE_ID'. Keeps placeholders readable and collision-free."""
+    token = re.sub(r"[^A-Za-z0-9]+", "_", label).strip("_").upper()
+    return token or "CUSTOM"
 
 
 class Scrubber:
@@ -72,6 +82,11 @@ class Scrubber:
         self.language = language
         self.model = model
         self.score_threshold = score_threshold
+
+        # User-defined recognisers added at runtime via the UI. Kept in memory only
+        # (like everything else, never persisted) and applied on top of the pack.
+        self._custom_defs: List[Dict[str, object]] = []
+        self._custom_recognizers: List[PatternRecognizer] = []
 
         if use_nlp_engine:
             self._analyzer = self._build_full_analyzer(model, language)
@@ -125,8 +140,84 @@ class Scrubber:
         return restore(scrubbed_text, mapping)
 
     def entities(self) -> List[str]:
-        """The entity types the security pack can produce."""
-        return supported_entities()
+        """The entity types the security pack can produce, plus any custom ones."""
+        custom = [str(d["entity"]) for d in self._custom_defs]
+        return sorted(set(supported_entities()) | set(custom))
+
+    # -- custom recognisers --------------------------------------------------
+
+    def add_custom_recognizer(
+        self,
+        label: str,
+        regex: str,
+        score: float = 0.6,
+        context: List[str] | None = None,
+    ) -> Dict[str, object]:
+        """Register a user-defined regex recogniser. Returns its stored definition.
+
+        The regex is compiled here so a bad pattern fails fast with a clear error
+        instead of blowing up mid-scrub. ``label`` is normalised to an entity token
+        (e.g. 'Employee ID' -> EMPLOYEE_ID); adding the same entity twice replaces
+        the previous definition.
+        """
+        entity = _normalise_entity(label)
+        try:
+            re.compile(regex)
+        except re.error as exc:
+            raise ValueError(f"Invalid regular expression: {exc}") from exc
+        if not 0.0 <= score <= 1.0:
+            raise ValueError("score must be between 0 and 1.")
+
+        # Replace any existing recogniser for this entity so re-adding edits it.
+        self.remove_custom_recognizer(entity)
+
+        recognizer = PatternRecognizer(
+            supported_entity=entity,
+            name=f"custom_{entity}",
+            patterns=[Pattern(name=f"custom_{entity}", regex=regex, score=score)],
+            context=context or [],
+        )
+        if self.use_nlp_engine:
+            self._analyzer.registry.add_recognizer(recognizer)
+        else:
+            self._recognizers.append(recognizer)
+        self._custom_recognizers.append(recognizer)
+
+        definition = {
+            "entity": entity,
+            "label": label,
+            "regex": regex,
+            "score": score,
+            "context": context or [],
+        }
+        self._custom_defs.append(definition)
+        return definition
+
+    def remove_custom_recognizer(self, entity: str) -> bool:
+        """Remove a custom recogniser by its (normalised) entity. Returns True if one
+        was removed. No-op for unknown entities and for the built-in pack."""
+        entity = _normalise_entity(entity)
+        before = len(self._custom_defs)
+        self._custom_defs = [d for d in self._custom_defs if d["entity"] != entity]
+        if len(self._custom_defs) == before:
+            return False
+
+        name = f"custom_{entity}"
+        self._custom_recognizers = [
+            r for r in self._custom_recognizers if r.name != name
+        ]
+        if self.use_nlp_engine:
+            try:
+                self._analyzer.registry.remove_recognizer(name)
+            except Exception:
+                pass  # registry API varies; the def removal above is the source of truth
+        else:
+            self._recognizers = [r for r in self._recognizers if r.name != name]
+        return True
+
+    def custom_recognizers(self) -> List[Dict[str, object]]:
+        """The currently registered custom recogniser definitions."""
+        return list(self._custom_defs)
 
     # -- detection -----------------------------------------------------------
 
