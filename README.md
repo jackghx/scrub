@@ -233,5 +233,5 @@ MIT
 
 ---
 
-*This README reflects scrub v0.3.0. The detected-entity list and CLI flags are the
+Note to self: *This README reflects scrub v0.3.0. The detected-entity list and CLI flags are the
 two things most likely to drift; keep this section honest as recognisers are added.*
