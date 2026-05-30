@@ -1,5 +1,5 @@
 """
-security_recognizers.py
+security_recognisers.py
 =======================
 
 A Presidio recogniser pack tuned for *security and infrastructure artefacts*,
@@ -28,7 +28,7 @@ Design notes
 Usage
 -----
     from presidio_analyzer import AnalyzerEngine
-    from security_recognizers import register_security_recognizers
+    from security_recognisers import register_security_recognizers
 
     analyzer = AnalyzerEngine()
     register_security_recognizers(analyzer)

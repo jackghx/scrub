@@ -1,6 +1,6 @@
 """Precedence + negative tests for the expanded recogniser pack.
 
-The standalone ``find_entities`` harness in ``test_recognizers.py`` runs each
+The standalone ``find_entities`` harness in ``test_recognisers.py`` runs each
 recogniser in isolation, so it can prove a regex fires but NOT how competing
 detections resolve. These cases run the full ``Scrubber`` pipeline (detect ->
 context-enhance -> threshold -> overlap-resolve) to assert the behaviour the

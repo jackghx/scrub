@@ -6,7 +6,7 @@ import { InputPane } from "@/components/InputPane";
 import { OriginalPane } from "@/components/OriginalPane";
 import { ReviewPane } from "@/components/ReviewPane";
 import { DetectionList } from "@/components/DetectionList";
-import { RecognizerPanel } from "@/components/RecognizerPanel";
+import { RecognizerPanel } from "@/components/RecogniserPanel";
 import { RestorePanel } from "@/components/RestorePanel";
 import { scrub, ApiError, API_BASE } from "@/lib/api";
 import { entityMeta } from "@/lib/entities";

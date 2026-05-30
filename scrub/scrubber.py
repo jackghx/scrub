@@ -2,7 +2,7 @@
 scrubber.py
 ===========
 
-The ``Scrubber`` ties the detection layer (``security_recognizers``) to the
+The ``Scrubber`` ties the detection layer (``security_recognisers``) to the
 consistent pseudonymiser (``pseudonymizer``) behind one small surface:
 
     s = Scrubber()
@@ -34,7 +34,7 @@ from presidio_analyzer import Pattern, PatternRecognizer
 
 from context_enhancer import enhance_with_context
 from pseudonymizer import ScrubResult, pseudonymize, restore
-from security_recognizers import (
+from security_recognisers import (
     get_security_recognizers,
     register_security_recognizers,
     supported_entities,

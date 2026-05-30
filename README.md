@@ -193,7 +193,7 @@ silently degrades.
 
 ## Architecture
 
-- **`security_recognizers.py`:** the detection pack (Presidio recognisers +
+- **`security_recognisers.py`:** the detection pack (Presidio recognisers +
   validated IP/credit-card logic).
 - **`pseudonymizer.py`:** turns detections into stable placeholders and back.
 - **`scrubber.py`:** ties detection + pseudonymisation behind one `Scrubber`

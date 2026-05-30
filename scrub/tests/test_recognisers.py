@@ -1,5 +1,5 @@
 """
-test_recognizers.py, exercises every recogniser in the pack.
+test_recognisers.py, exercises every recogniser in the pack.
 
 PatternRecognizer.analyze() and our custom IpAddressRecognizer.analyze() both run
 without an NLP engine, so we can validate detection logic without downloading a
@@ -7,7 +7,7 @@ spaCy model. Each case asserts that a given entity is found in (or absent from) 
 sample string.
 """
 
-from security_recognizers import get_security_recognizers
+from security_recognisers import get_security_recognizers
 
 # (description, text, expected_entity, should_be_found)
 CASES = [

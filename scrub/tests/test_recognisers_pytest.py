@@ -1,6 +1,6 @@
 """Wire the provided recogniser script into pytest.
 
-The original ``test_recognizers.py`` is a standalone print-based harness (a
+The original ``test_recognisers.py`` is a standalone print-based harness (a
 ``CASES`` table + ``find_entities`` + a ``main()``). We keep that file untouched,
 it is the foundation and still runs on its own, and simply import its data here so
 the same 19 cases are collected and asserted by ``pytest`` alongside the
@@ -9,7 +9,7 @@ pseudonymisation tests.
 
 import pytest
 
-from test_recognizers import CASES, find_entities
+from test_recognisers import CASES, find_entities
 
 
 @pytest.mark.parametrize(
