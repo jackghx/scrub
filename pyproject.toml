@@ -4,7 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scrub-sanitiser"
-version = "0.3.0"
+# Single source of truth for the version: scrub/__init__.py:__version__.
+# setuptools reads it via the [tool.setuptools.dynamic] entry below, and the CLI/API
+# import the same attribute at runtime, so there is exactly one number to bump.
+dynamic = ["version"]
 description = "Local-first security-artefact sanitiser, strip secrets and infra identifiers out of logs/configs before you share them."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -23,6 +26,9 @@ dev = ["pytest"]
 [project.scripts]
 # `pip install -e .` puts a `scrub` command on PATH -> scrub/cli.py:main().
 scrub = "scrub.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "scrub.__version__" }
 
 [tool.setuptools]
 # `scrub/` is the package. Its modules import each other flat (e.g.

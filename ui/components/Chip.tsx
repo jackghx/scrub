@@ -2,23 +2,16 @@
 
 import { entityColor } from "@/lib/entities";
 
-/** An inline placeholder chip in the review pane, e.g. [INTERNAL_IP_1], coloured by
- *  entity type. Rendered where a detection is KEPT. */
+/** An inline placeholder in the review pane, e.g. <INTERNAL_IP_1>, rendered with a color that matches the entity type, and a tooltip that shows the original value. */
 export function Chip({ placeholder, entity }: { placeholder: string; entity: string }) {
   const color = entityColor(entity);
-  // Swap the < > the API uses for square brackets so chips read as UI, not literals.
-  const label = placeholder.replace(/^</, "[").replace(/>$/, "]");
   return (
     <span
-      className="mono inline-flex items-center rounded px-1.5 py-px text-[0.85em] font-medium align-baseline"
-      style={{
-        color,
-        backgroundColor: `${color}1a`, // ~10% alpha
-        border: `1px solid ${color}59`, // ~35% alpha
-      }}
+      className="mono font-medium align-baseline"
+      style={{ color }}
       title={`${entity} (kept, scrubbed)`}
     >
-      {label}
+      {placeholder}
     </span>
   );
 }

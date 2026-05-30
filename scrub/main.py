@@ -32,10 +32,16 @@ from pydantic import BaseModel, Field
 
 from scrubber import Scrubber
 
+try:
+    # Installed (the supported way to run the API): reflects scrub/__init__.py live.
+    from scrub import __version__ as _version
+except Exception:  # bare flat run without the package installed
+    _version = "0+unknown"
+
 app = FastAPI(
     title="Scrub",
     description="Local-first security-artefact sanitiser. Data never leaves the machine.",
-    version="0.2.0",
+    version=_version,
 )
 
 # The review UI runs on localhost:3000 and this API on :8000, a cross-origin pair,

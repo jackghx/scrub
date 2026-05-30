@@ -7,4 +7,4 @@ bootstraps ``sys.path`` with this directory so those imports work in every entry
 (console script, ``python -m``, pytest) without modifying the core modules.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"

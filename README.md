@@ -1,43 +1,158 @@
-# Scrub, local-first security-artefact sanitiser
+![CI](https://github.com/jackghx/scrub/actions/workflows/ci.yml/badge.svg)
 
-**Strip secrets and infrastructure identifiers out of logs, configs, and terminal
-output before you share them, with a human review step so you decide what leaves
-your machine.**
+# Scrub, the local-first security-artefact sanitiser
 
-Scrub runs entirely on your machine. Paste or pipe in an artefact; it detects
-internal IPs, hostnames, cloud keys, tokens, private keys, and connection strings,
-replaces each with a stable placeholder (e.g. `<INTERNAL_IP_1>`), and gives you a
-diff to review before anything is exported. Nothing is ever sent anywhere.
+Scrub removes secrets and infrastructure identifiers from logs, configs, and terminal
+output before you share them in a GitHub issue, a support ticket, a forum, or a blog
+post. It shows you what it found so you can review and adjust the result before copying
+it out.
+
+> **The data never leaves your machine.** There are no network calls in the scrubbing
+> path and no telemetry. The API runs on `127.0.0.1`, and the UI's browser only ever
+> talks to that local API.
+
+It isn't a general-purpose PII tool. It focuses on what tends to leak in security and
+infrastructure work: internal IPs, hostnames, MAC addresses, cloud keys, tokens, private
+keys, and connection strings. Each match is replaced with a stable, reversible
+placeholder like `<INTERNAL_IP_1>`, so the scrubbed file still reads sensibly and you can
+restore the original exactly from the saved mapping.
 
 ---
 
-## Why
+## Human in the loop
 
-Engineers leak secrets every day by pasting logs into GitHub issues, vendor
-tickets, forums, and chat. General PII tools target names and emails; they miss
-the things that actually leak in security and infrastructure work: internal IPs,
-MAC addresses, cloud keys, JWTs, private-key blocks, DB connection strings.
+Scrub favours recall: it flags everything it suspects, because missing a secret is worse
+than flagging one that turns out to be harmless. That trade-off only works if you can see
+and correct what it flagged, so the tool applies its detections but leaves the final call
+to you. The UI shows every detection and lets you toggle each one, and it never describes
+the output as "safe" or "clean". Check the result yourself before you share it.
 
-Scrub fills that gap, and keeps a reversible mapping so the scrubbed artefact
-stays useful (you can follow which host talked to which) without exposing the real
-identifiers.
+A dismissed detection is restored to its original value in the output and marked with an
+amber warning highlight, so anything you choose to keep in the clear is impossible to miss.
+
+---
+
+## Three ways to use it
+
+| Use | What you get | Docs |
+|-----|------|-------|
+| **Review UI** | A two-pane paste → review → export screen with per-detection toggles. The easiest place to start. | [Get started](#get-started-the-review-ui) · [`ui/README.md`](ui/README.md) |
+| **CLI** | The `scrub` command for piping, scripting, and CI. | [Command line](#command-line) · [`scrub/README.md`](scrub/README.md) |
+| **Pre-commit hook** | A git hook that blocks commits containing secrets. | [Git pre-commit hook](#git-pre-commit-hook) |
+
+All three sit on the same detection engine in [`scrub/`](scrub). The front end lives in
+[`ui/`](ui); the hook in [`hooks/`](hooks). This page is the overview and quickstart;
+the per-folder READMEs have the full reference.
+
+---
+
+## Get started (the review UI)
+
+**You need:** Python 3.9+ and Node.js 18+ (with npm). That's it, the default mode needs
+no NLP model.
+
+**1. Install Scrub with the API server** (from the repo root):
+
+```bash
+pip install -e ".[api]"
+```
+
+This puts the `scrub` command on your PATH *and* installs the local API (FastAPI +
+uvicorn) the UI talks to. To keep Scrub's dependencies isolated from your system Python,
+run it inside a virtualenv first (`python -m venv .venv`, then activate it).
+
+**2. Start the API** (terminal 1):
+
+```bash
+cd scrub
+uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+**3. Start the UI** (terminal 2):
+
+```bash
+cd ui
+npm install        # first run only
+npm run dev
+```
+
+**4. Open <http://localhost:3000>.** Paste an artefact (try
+[`scrub/sample.log`](scrub/sample.log)), hit **Scrub**, review the colour-coded
+detections, toggle anything you want to keep in the clear, and copy the result. Switch to
+the diff view to compare the original against the scrubbed output side by side.
+
+> The UI talks only to `http://127.0.0.1:8000`; override with `NEXT_PUBLIC_SCRUB_API`.
+> Full UI behaviour, the toggle model, diff view, and production build, is documented in
+> [`ui/README.md`](ui/README.md).
+
+---
+
+## Command line
+
+If you only want the `scrub` command (no UI), the install is one line from the repo root:
+
+```bash
+pip install -e .
+```
+
+That's all the CLI needs, no web server, no NLP model. Then:
+
+```bash
+scrub app.log                        # print the scrubbed text to your terminal
+scrub app.log > clean.txt            # ...or write it straight to a file
+cat app.log | scrub                  # also works in a pipe (reads from stdin)
+scrub app.log --mapping map.json > clean.txt   # save the result AND the mapping that can undo it
+scrub --restore map.json clean.txt   # rebuild the original from a scrubbed file + its mapping
+scrub --check app.log                # just report what it found (masked), exit 1 if any secret found
+```
+
+Only the scrubbed (or restored) text is printed, so `>` and pipes stay clean; every
+report, warning, and error goes to a separate stream instead of mixing into that output.
+The mapping holds the real secrets, so it's written only to the `--mapping` file you name,
+never printed. The **full flag table** (`--threshold`, `--allow`, `--check`, and the rest)
+is in [`scrub/README.md`](scrub/README.md#cli-usage).
+
+---
+
+## Git pre-commit hook
+
+`scrub --check` exits non-zero when it finds a secret, which lets a git pre-commit hook
+abort the commit before secrets are ever committed. With the CLI installed
+(`pip install -e .`), install the hook into this repo:
+
+```bash
+./hooks/install.sh        # copies hooks/pre-commit into .git/hooks
+```
+
+…or, for [pre-commit](https://pre-commit.com) framework users, the repo ships a
+[`.pre-commit-config.yaml`](.pre-commit-config.yaml) (`pip install pre-commit && pre-commit install`).
+
+**On Windows:** the hook is a bash script; git runs it through the Git Bash that ships
+with Git, so run `./hooks/install.sh` from a Git Bash shell (or use the cross-platform
+`pre-commit` route above).
+
+The hook blocks a commit on any high-confidence finding and prints a **masked** report,
+so secrets never hit your scrollback. It can be bypassed with `git commit --no-verify`,
+so treat it as a safety net rather than a guarantee. It scans the *staged* content of
+each text file; see [`hooks/pre-commit`](hooks/pre-commit) for the script itself.
 
 ---
 
 ## What it detects
 
 The detection pack ships **33 entity types**. Two are validated in code rather than
-trusted from a regex, IP addresses via the stdlib `ipaddress` module, and credit
-cards via the Luhn checksum, and several FP-prone patterns are deliberately scored
-low and only cross the threshold when supporting context words are nearby.
+trusted to a regex, IP addresses (via the standard-library `ipaddress` module) and credit
+cards (via the Luhn checksum), and several patterns that are prone to false positives are
+scored low on purpose, so they only cross the threshold when supporting context words
+appear nearby.
 
 - **Network identifiers:** `INTERNAL_IP`, `PUBLIC_IP` (IPv4 + IPv6, validated),
   `MAC_ADDRESS`, `HOSTNAME`
 - **Cloud / provider keys:** `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, `AWS_ACCOUNT_ID`,
-  `GOOGLE_API_KEY`, `STRIPE_KEY`, `OPENAI_KEY`, `OPENROUTER_KEY`,
-  `FCM_SERVER_KEY`, `SENDGRID_KEY`, `TWILIO_SID`
-- **Source-control / package tokens:** `GITHUB_TOKEN`, `GITLAB_TOKEN`,
-  `NPM_TOKEN`, `SHOPIFY_TOKEN`
+  `GOOGLE_API_KEY`, `STRIPE_KEY`, `OPENAI_KEY`, `OPENROUTER_KEY`, `FCM_SERVER_KEY`,
+  `SENDGRID_KEY`, `TWILIO_SID`
+- **Source-control / package tokens:** `GITHUB_TOKEN`, `GITLAB_TOKEN`, `NPM_TOKEN`,
+  `SHOPIFY_TOKEN`
 - **Chat tokens & webhooks:** `SLACK_TOKEN`, `SLACK_WEBHOOK`, `DISCORD_TOKEN`,
   `DISCORD_WEBHOOK`, `TELEGRAM_BOT_TOKEN`
 - **Auth tokens / generic secrets:** `JWT`, `BEARER_TOKEN`, `GENERIC_API_KEY`
@@ -46,192 +161,58 @@ low and only cross the threshold when supporting context words are nearby.
 - **PII:** `EMAIL_ADDRESS`, `CREDIT_CARD` (Luhn-validated)
 - **Filesystem:** `UNIX_HOME_PATH` (username leak)
 
-The live list is always available from the API (`GET /entities`) or
-`Scrubber().entities()`. You can also add your own regex recognisers at runtime
-from the review UI (see below), they run alongside the built-in pack.
+The current list is always available from the API (`GET /entities`) or
+`Scrubber().entities()`. You can also add your own regex recognisers at runtime from the
+review UI; they run alongside the built-in pack.
 
 ---
 
-## Install
+## Security & CI
+
+Dependency advisories are triaged and documented in [`SECURITY.md`](SECURITY.md) (a
+security tool shouldn't ship untriaged vulns), and
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the Python tests, the UI
+build/type-check, and a dependency audit gated at `high` on every push and PR. To run the
+Python tests yourself, install the test extra (`[dev]`, which adds pytest), then run the
+suite from `scrub/`:
 
 ```bash
-pip install -e .
-```
-
-This puts a `scrub` command on your PATH. The only runtime dependency for the CLI
-is `presidio-analyzer`; the API service and full-Presidio mode are optional extras
-(`pip install -e ".[api]"`, and a spaCy model for full mode).
-
----
-
-## CLI usage
-
-```bash
-scrub app.log                      # scrubbed text -> stdout
-scrub app.log --mapping m.json     # also save the reversible mapping
-cat app.log | scrub                # read stdin, scrub, write stdout
-scrub --restore m.json s.txt       # reconstruct the original
-scrub --check app.log              # report secrets (stderr); exit 1 if any
-```
-
-| Flag | Mode | Meaning |
-| --- | --- | --- |
-| `FILE…` | all | Input file(s). Omit or use `-` to read stdin. Multiple files are only meaningful with `--check`. |
-| `--check` | check | Detection only: print a masked report to stderr, exit 1 if any finding is at/above the threshold, else 0. Built for pre-commit hooks. |
-| `--restore MAPPING.json` | restore | Reconstruct the original from scrubbed input + this mapping. |
-| `--mapping PATH` | transform | Also write the reversible `{placeholder: original}` mapping as JSON to `PATH`. |
-| `-t`, `--threshold N` | transform / check | Only act on detections scoring ≥ N (default `0.6`; use `0` to scrub everything, recall over precision). |
-| `--allow ENTITY_TYPE` | check | Suppress an entity type, e.g. `--allow PUBLIC_IP`. Repeatable. |
-| `--label NAME` | check | Name to use for stdin in the report (default `<stdin>`). |
-| `--no-near-miss` | check | Don't print the non-blocking notice about sub-threshold detections on a passing commit. |
-| `--no-color` | all | Disable coloured output (colour is stderr-only and already auto-off when stderr isn't a TTY or `NO_COLOR` is set). |
-| `--quiet` | all | Suppress the progress spinner on slow interactive runs. |
-| `-V`, `--version` | n/a | Print version and exit. |
-
-Running `scrub` with no input and an interactive terminal prints usage and exits 2
-(it won't hang waiting on stdin).
-
-The contract that keeps it pipeable and safe:
-
-- Scrubbed / restored text is the **only** thing on **stdout**.
-- Diagnostics, reports, and errors go to **stderr**, including a masked summary of
-  low-confidence detections that were *not* applied, so nothing is silently dropped.
-- The reversible mapping holds the real secrets, so it is written **only** to the
-  `--mapping` path you ask for, never to stdout.
-- `--check` and every report **mask** each value, so secrets never hit your
-  scrollback or CI logs.
-
----
-
-## Git pre-commit hook
-
-`--check` is designed to drop into a git pre-commit hook so secrets are caught
-before they are committed. A ready-made hook and installers live in
-[`hooks/`](hooks/):
-
-```bash
-hooks/install.sh        # bash / macOS / Linux
-hooks/install.ps1       # Windows PowerShell
-```
-
-The hook blocks a commit (exit 1) on any high-confidence finding and prints a
-masked report; sub-threshold near-misses are noted without blocking.
-
----
-
-## The review UI
-
-A local web UI (Next.js) for the paste → review → export flow:
-
-```bash
-cd ui
-npm install
-npm run dev   # http://localhost:3000
-```
-
-It talks only to the local API (`http://127.0.0.1:8000`); start that with:
-
-```bash
-cd scrub
-uvicorn main:app --host 127.0.0.1 --port 8000
-```
-
-What the UI gives you:
-
-- **Paste or load files:** drag-and-drop or pick multiple files; each opens in its
-  own tab. Files are read in the browser; only the text reaches the localhost API.
-- **Review with line numbers:** the scrubbed output is line-numbered; click a
-  detection to scroll to and highlight that line. A gutter "minimap" shows where in
-  the artefact data was scrubbed.
-- **Diff view:** toggle to see the original (with highlights) beside the scrubbed
-  output.
-- **Per-detection control:** keep/dismiss individual detections, filter/search the
-  list, and move a confidence-threshold slider; the export updates instantly.
-- **Custom recognisers:** add your own regex patterns at runtime (in memory only).
-- **Restore round-trip:** reconstruct the original from the in-memory mapping to
-  confirm the scrub is reversible.
-
-API endpoints (all localhost-only): `POST /scrub`, `POST /restore`,
-`GET /entities`, `GET /health`, and `GET/POST/DELETE /recognizers` for the custom
-recogniser set.
-
----
-
-## How it works
-
-- **Stable, reversible pseudonymisation.** Every occurrence of the same value gets
-  the same placeholder, so the scrubbed artefact still reads as a coherent trace;
-  the kept mapping reconstructs the original byte-for-byte.
-- **Context-aware scoring.** In the default (custom-pack-only, no-spaCy) mode, a
-  lightweight character-window check raises a detection's score when the
-  recogniser's context words are nearby, so a real AWS secret next to
-  `aws_secret_access_key` clears the threshold while a bare 40-char blob does not.
-- **Validated, not just matched.** IPs and credit-card numbers are validated in
-  code (stdlib `ipaddress`, Luhn) rather than trusted from a regex.
-- **Local-first.** No network calls in the scrub path; no telemetry.
-
----
-
-## Optional: full Presidio mode
-
-The default mode runs the custom pack only, no spaCy model needed. To also get
-Presidio's built-in human-PII recognisers (`PERSON`, etc.) on top:
-
-```bash
-python -m spacy download en_core_web_lg
-```
-
-```python
-Scrubber(use_nlp_engine=True)          # security pack + built-in PII
-```
-
-For the API, set `SCRUB_USE_NLP=1` before launching `uvicorn`. If the model isn't
-installed, Scrub fails fast with the exact `spacy download` command, it never
-silently degrades.
-
----
-
-## Architecture
-
-- **`security_recognisers.py`:** the detection pack (Presidio recognisers +
-  validated IP/credit-card logic).
-- **`pseudonymizer.py`:** turns detections into stable placeholders and back.
-- **`scrubber.py`:** ties detection + pseudonymisation behind one `Scrubber`
-  class, and holds any runtime custom recognisers.
-- **`context_enhancer.py`:** spaCy-free context scoring for custom-only mode.
-- **`cli.py`:** the command-line interface.
-- **`main.py`:** the localhost API used by the review UI.
-- **`ui/`:** the Next.js review UI.
-
----
-
-## Known limitations
-
-- Detection is **pattern + context based**, not semantic. Novel, obfuscated, or
-  malformed secrets may not match, by design, the pack favours precision on the
-  high-confidence patterns and leans on context for the ambiguous ones.
-- At low thresholds, bare values can be mislabelled (the long tail favours recall);
-  raise `--threshold`, or use the review step, to tighten this.
-- The pack is **not exhaustive:** it targets the identifiers that actually leak in
-  security/infra work, not every possible secret format.
-- **Review before export is the safety net.** Scrub surfaces what it found (and what
-  it nearly found); a human still decides what is safe to share.
-
----
-
-## Testing
-
-```bash
+pip install -e ".[dev]"
 cd scrub && pytest
 ```
 
 ---
 
-## License
+## No persistence of secrets
 
-MIT
+The mapping that reverses a scrub holds the real secrets. It is returned by the API for
+the caller to hold and is kept **in memory only** in the UI. It is never written to disk,
+`localStorage`, or anywhere else. The repo's `.gitignore` also excludes
+`*.mapping.json`. Treat any mapping you do save like the credentials it contains.
 
 ---
 
-Note to self: *This README reflects scrub v0.3.0. The detected-entity list and CLI flags are the
-two things most likely to drift; keep this section honest as recognisers are added.*
+## Known limitations
+
+Detection is **pattern + context based**, not semantic, so novel or obfuscated secrets
+may not match, and at low thresholds bare values can be mislabelled (the long tail favours
+recall). The pack is not exhaustive; it targets what actually leaks in security/infra
+work. **Review before export is the safety net:** Scrub surfaces what it found (and what
+it nearly found); a human still decides what is safe to share. The engine internals, and
+the optional full-Presidio mode that adds human-PII recognisers, are in
+[`scrub/README.md`](scrub/README.md#optional-full-presidio-mode).
+
+---
+
+## Roadmap (not built yet)
+
+Format-preserving pseudonymisation (fake-but-valid IP/MAC), an encrypted vault for the
+mapping at rest, and screenshot OCR + visual redaction. Any future LLM recogniser would
+have to run locally (for example via Ollama) and be opt-in, so the local-first behaviour
+still holds.
+
+---
+
+## License
+
+MIT, see [`LICENSE`](LICENSE).

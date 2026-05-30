@@ -248,14 +248,11 @@ export default function Page() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] px-5 py-3">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-2">
         <div className="flex items-baseline gap-3">
           <h1 className="text-lg font-bold tracking-tight text-[var(--color-ink)]">
             Scrub
           </h1>
-          <p className="hidden text-xs text-[var(--color-muted)] sm:block">
-            See what was detected, decide what to scrub, then export.
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <span className="mono text-xs text-[var(--color-faint)]">{API_BASE}</span>
@@ -270,8 +267,8 @@ export default function Page() {
         onAdd={addDoc}
       />
 
-      <main className="flex flex-1 flex-col gap-4 p-4">
-        <div className="grid items-start gap-4 lg:grid-cols-2">
+      <main className="flex flex-1 flex-col gap-3 p-3">
+        <div className="grid items-start gap-3 lg:grid-cols-2">
           <div className="h-[62vh] min-h-[340px] resize-y overflow-hidden">
             {diff && active.data ? (
               <OriginalPane tokens={originalTokens} />
@@ -307,8 +304,8 @@ export default function Page() {
         </div>
 
         {presentEntities.length > 0 && (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-panel)] px-4 py-2.5">
-            <span className="text-xs font-medium text-[var(--color-faint)]">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-[var(--color-border)] px-1 pt-3">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-faint)]">
               Legend
             </span>
             {presentEntities.map((e) => {
@@ -316,7 +313,7 @@ export default function Page() {
               return (
                 <span key={e} className="flex items-center gap-1.5 text-xs">
                   <span
-                    className="inline-block h-2.5 w-2.5 rounded-sm"
+                    className="inline-block h-2.5 w-2.5 rounded-[1px]"
                     style={{ backgroundColor: m.color }}
                   />
                   <span className="text-[var(--color-muted)]">{m.label}</span>

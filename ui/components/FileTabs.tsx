@@ -38,7 +38,7 @@ export function FileTabs({ tabs, activeId, onSelect, onClose, onAdd }: FileTabsP
             }}
             className={`group flex shrink-0 items-center gap-2 border-b-2 px-3 py-1.5 text-xs transition-colors ${
               active
-                ? "border-[var(--color-accent)] text-[var(--color-ink)]"
+                ? "border-[var(--color-ink)] text-[var(--color-ink)]"
                 : "border-transparent text-[var(--color-muted)] hover:text-[var(--color-ink)]"
             }`}
           >
@@ -49,7 +49,7 @@ export function FileTabs({ tabs, activeId, onSelect, onClose, onAdd }: FileTabsP
             >
               {t.scrubbed && (
                 <span
-                  className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-accent)]"
+                  className="inline-block h-1.5 w-1.5 shrink-0 rounded-[1px] bg-[var(--color-ink)]"
                   aria-hidden
                 />
               )}
@@ -57,7 +57,7 @@ export function FileTabs({ tabs, activeId, onSelect, onClose, onAdd }: FileTabsP
             </button>
             <button
               onClick={() => onClose(t.id)}
-              className="shrink-0 text-[var(--color-faint)] opacity-60 transition-opacity hover:text-[var(--color-warn)] group-hover:opacity-100"
+              className="shrink-0 px-1 text-[var(--color-faint)] opacity-60 transition-opacity hover:text-[var(--color-warn)] group-hover:opacity-100"
               aria-label={`Close ${t.name}`}
               title="Close"
             >

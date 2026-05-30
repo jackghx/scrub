@@ -66,8 +66,8 @@ export function DetectionList(props: DetectionListProps) {
   const filtering = query.trim() !== "" || entityFilter !== "";
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-panel)]">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-2.5">
+    <section className="flex h-full min-h-0 flex-col rounded-md border border-[var(--color-border)] bg-[var(--color-panel)]">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--color-border)] px-4 py-2">
         <div className="flex items-baseline gap-2">
           <h2 className="text-sm font-semibold tracking-wide text-[var(--color-ink)]">
             Detections
@@ -89,7 +89,7 @@ export function DetectionList(props: DetectionListProps) {
       </header>
 
       {/* Threshold + bulk controls */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--color-border)] px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[var(--color-border)] px-4 py-2">
         <div className="flex items-center gap-2">
           <span className="text-xs text-[var(--color-muted)]">Min confidence</span>
           <input
@@ -130,12 +130,12 @@ export function DetectionList(props: DetectionListProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search value, type or placeholder"
-            className="mono min-w-0 flex-1 rounded border border-[var(--color-border-strong)] bg-transparent px-2 py-1 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-faint)] focus:border-[var(--color-accent)] focus:outline-none"
+            className="mono min-w-0 flex-1 rounded border border-[var(--color-border-strong)] bg-transparent px-2 py-1 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-faint)] focus-visible:border-[var(--color-ink)] focus-visible:outline-none"
           />
           <select
             value={entityFilter}
             onChange={(e) => setEntityFilter(e.target.value)}
-            className="rounded border border-[var(--color-border-strong)] bg-[var(--color-panel)] px-2 py-1 text-xs text-[var(--color-ink)] focus:border-[var(--color-accent)] focus:outline-none"
+            className="rounded border border-[var(--color-border-strong)] bg-[var(--color-panel)] px-2 py-1 text-xs text-[var(--color-ink)] focus-visible:border-[var(--color-ink)] focus-visible:outline-none"
             aria-label="Filter by entity type"
           >
             <option value="">All types</option>
@@ -180,7 +180,7 @@ export function DetectionList(props: DetectionListProps) {
                 <li
                   key={g.placeholder}
                   onClick={() => line !== undefined && onLocate(line)}
-                  className="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-xs transition-colors hover:bg-[var(--color-bg)]"
+                  className="flex cursor-pointer items-center gap-3 px-4 py-2 text-xs transition-colors hover:bg-[var(--color-bg)]"
                   style={{ opacity: isKept ? 1 : 0.55 }}
                   title="Jump to this line in the review"
                 >
@@ -233,7 +233,7 @@ export function DetectionList(props: DetectionListProps) {
                         e.stopPropagation();
                         onRevealRow(g.placeholder);
                       }}
-                      className="shrink-0 text-[var(--color-faint)] uppercase tracking-wide transition-colors hover:text-[var(--color-muted)]"
+                      className="shrink-0 px-1 text-[var(--color-faint)] uppercase tracking-wide transition-colors hover:text-[var(--color-muted)]"
                       title={revealed ? "Hide value" : "Reveal value"}
                       aria-label={revealed ? "Hide value" : "Reveal value"}
                     >

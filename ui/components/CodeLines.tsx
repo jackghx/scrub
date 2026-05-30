@@ -25,12 +25,12 @@ export const CodeLines = forwardRef<HTMLDivElement, CodeLinesProps>(
             <div
               key={i}
               data-line={i}
-              className={`flex ${flash ? "bg-[var(--color-accent)]/10" : ""}`}
+              className={`flex ${flash ? "bg-[var(--color-ink)]/10" : ""}`}
             >
               <span
                 className={`w-14 shrink-0 select-none px-3 text-right ${
                   flash
-                    ? "bg-[var(--color-accent)] font-semibold text-[#04222a]"
+                    ? "bg-[var(--color-ink)] font-semibold text-[var(--color-bg)]"
                     : "text-[var(--color-faint)]"
                 }`}
               >

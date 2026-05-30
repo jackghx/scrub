@@ -6,27 +6,27 @@ how each was handled, states the threat model, and explains how to report a prob
 
 ## Threat model
 
-- **All input is untrusted.** Scrub exists to be fed logs, configs, and terminal output,
-  by design, content that may originate from hostile or compromised systems. We therefore
-  do **not** treat "it only runs on localhost" as a security boundary. Front-end and
-  dependency vulnerabilities are kept patched on their merits, not waved away because the
-  UI is local.
-- **Local-first guarantee.** There are **no network calls in the scrub/check path**, not
+- **All input is untrusted.** Scrub is built to be fed logs, configs, and terminal
+  output, which may have come from hostile or compromised systems. So we do **not** treat
+  "it only runs on localhost" as a security boundary. Front-end and dependency
+  vulnerabilities are patched on their merits, not waved away because the UI is local.
+- **Local-first guarantee.** There are **no network calls in the scrub/check path**: not
   in the Python core (`scrub/`), the CLI, the `--check` scanner, or the review UI's
-  scrubbing flow. No telemetry, no analytics, no "phone home". The browser UI talks only
-  to the local API; CORS is restricted to `127.0.0.1:3000` / `localhost:3000`.
+  scrubbing flow. There is no telemetry and no analytics. The browser UI talks only to
+  the local API, and CORS is restricted to `127.0.0.1:3000` / `localhost:3000`.
 - **Custom recognisers stay local and in-memory.** The API's `/recognizers` endpoints
   let the UI register user-supplied regex recognisers at runtime. These are held in
-  memory only (never persisted, gone on restart) and the regex is compiled on the
-  local, single-user service, a pathological pattern is a self-inflicted local cost,
-  not a remote-exploitable surface, since the API is localhost-bound and CORS-locked.
+  memory only (never persisted, gone on restart), and the regex is compiled on the local,
+  single-user service. A pathological pattern is therefore a self-inflicted local cost
+  rather than a remotely exploitable surface, because the API is localhost-bound and
+  CORS-locked.
 - **Secrets are never emitted unmasked.** The CLI writes the reversible mapping (which
   contains the real secrets) only to the path you pass via `--mapping`, never to stdout.
   The `--check` scanner and the git pre-commit hook mask every value in their reports so
   secrets never land in terminal scrollback. The UI keeps mappings in memory only.
 - **The pre-commit hook must stay LF-terminated.** A CRLF on the shebang line breaks the
-  hook under many shells, and a broken pre-commit hook fails *open*, it silently stops
-  running, the worst failure mode for a leak-prevention control. The repo's
+  hook under many shells, and a broken pre-commit hook fails *open*: it silently stops
+  running, which is the worst failure mode for a leak-prevention control. The repo's
   `.gitattributes` forces LF on `hooks/pre-commit` and `*.sh` so a contributor with
   `core.autocrlf=true` cannot corrupt it.
 
@@ -47,9 +47,8 @@ For every advisory: if a non-breaking patched version exists, we apply it, regar
 severity (`npm overrides` counts as a patch when it stays within a compatible major). We
 reject "fixes" that trade a smaller issue for a larger regression (e.g. downgrading the
 whole framework several major versions, which would itself drop security patches). Any
-advisory we cannot patch without such a regression is recorded here as an accepted,
-documented, transitive risk with the date assessed and the upstream condition that will
-resolve it, never left silent.
+advisory we cannot patch without such a regression is recorded here as an accepted
+transitive risk, with the date assessed and the upstream condition that will resolve it.
 
 ## Continuous checks
 

@@ -529,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             from scrub import __version__
         except Exception:  # running flat without the installed package
-            __version__ = "0.3.0"
+            __version__ = "0+unknown"
         print(f"scrub {__version__}")
         return 0
 

@@ -5,21 +5,18 @@
 @theme {
   --color-bg: #0a0e14;
   --color-panel: #0f141c;
-  --color-panel-2: #131a24;
   --color-border: #1e2733;
   --color-border-strong: #2b3947;
   --color-ink: #e6edf3;
   --color-muted: #8b98a9;
   --color-faint: #5b6776;
-  --color-accent: #22d3ee;
-  --color-accent-2: #c084fc;
   --color-warn: #fbbf24;
   --color-warn-bg: #2a210a;
 
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, "Cascadia Code", "JetBrains Mono", "SFMono-Regular",
-    "Consolas", "Liberation Mono", Menlo, monospace;
+  --font-mono: "Consolas", "Cascadia Mono", ui-monospace, "SFMono-Regular",
+    Menlo, "Liberation Mono", monospace;
 }
 
 html,
@@ -37,6 +34,12 @@ body {
 .mono {
   font-family: var(--font-mono);
   font-variant-ligatures: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tabular figures for non-mono numeric runs (e.g. the "14 of 17" status). */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Thin, dark scrollbars that fit the theme. */
@@ -68,7 +71,7 @@ input[type="range"]::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: var(--color-accent);
+  background: var(--color-ink);
   cursor: pointer;
 }
 input[type="range"]::-moz-range-thumb {
@@ -76,6 +79,6 @@ input[type="range"]::-moz-range-thumb {
   height: 16px;
   border: none;
   border-radius: 50%;
-  background: var(--color-accent);
+  background: var(--color-ink);
   cursor: pointer;
 }

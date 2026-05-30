@@ -65,14 +65,11 @@ export function OriginalPane({ tokens }: { tokens: OriginalToken[] }) {
   );
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-panel)]">
-      <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
+    <section className="flex h-full min-h-0 flex-col rounded-md border border-[var(--color-border)] bg-[var(--color-panel)]">
+      <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
         <h2 className="text-sm font-semibold tracking-wide text-[var(--color-ink)]">
           Original
         </h2>
-        <span className="text-xs text-[var(--color-faint)]">
-          before scrubbing; highlights show what changes
-        </span>
       </header>
       <CodeLines lines={rendered} />
     </section>

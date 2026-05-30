@@ -4,10 +4,11 @@ The human-in-the-loop front end for [Scrub](../scrub). Paste a log or config, se
 the detectors found as colour-coded chips, decide what to scrub, then copy out a result
 you're confident in.
 
-> **Why this exists.** Detection is recall-favoured, it surfaces *everything*, because
-> under-scrubbing leaks a secret. That only works if a human can quickly see and correct
-> what was flagged before sharing. **This UI is that review step.** The tool surfaces and
-> applies; *you* decide what's safe. It never claims the output is "clean" or "safe".
+> **This UI is the review step.** Scrub's detection favours recall (it flags everything
+> it suspects, see [why in the project README](../README.md#human-in-the-loop)), which
+> only works if you can quickly see and correct what was flagged. The UI is where that
+> happens: it applies its detections but leaves the call to you, and it never describes
+> the output as "clean" or "safe".
 
 > **Local-first, no persistence.** The browser talks **only** to the local Scrub API,
 > no analytics, no CDN fonts, no external calls of any kind. The mapping that can reverse
@@ -21,7 +22,9 @@ font stacks only (nothing fetched from a font CDN).
 
 ## Run
 
-You need the API running first (see [`../scrub/README.md`](../scrub/README.md)):
+The UI needs the Scrub API running. Install it once from the repo root
+(`pip install -e ".[api]"`, the `[api]` extra is what provides uvicorn; full Python setup
+is in the [root quickstart](../README.md#get-started-the-review-ui)), then start both:
 
 ```bash
 # terminal 1, the API

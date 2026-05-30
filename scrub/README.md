@@ -1,54 +1,12 @@
-# Scrub, local-first security-artefact sanitiser
+# Scrub engine (`scrub/`)
 
-**Strip secrets and infrastructure identifiers out of logs, configs, and terminal
-output before you share them, with a human review step so you decide what leaves
-your machine.**
+The detection + pseudonymisation core behind Scrub: the recogniser pack, the consistent
+pseudonymiser, the `scrub` **CLI**, and the localhost **API**. This document is the
+engine/CLI/API reference.
 
-Scrub runs entirely on your machine. Paste or pipe in an artefact; it detects
-internal IPs, hostnames, cloud keys, tokens, private keys, and connection strings,
-replaces each with a stable placeholder (e.g. `<INTERNAL_IP_1>`), and gives you a
-diff to review before anything is exported. Nothing is ever sent anywhere.
-
----
-
-## Why
-
-Engineers leak secrets every day by pasting logs into GitHub issues, vendor
-tickets, forums, and chat. General PII tools target names and emails; they miss
-the things that actually leak in security and infrastructure work: internal IPs,
-MAC addresses, cloud keys, JWTs, private-key blocks, DB connection strings.
-
-Scrub fills that gap, and keeps a reversible mapping so the scrubbed artefact
-stays useful (you can follow which host talked to which) without exposing the real
-identifiers.
-
----
-
-## What it detects
-
-The detection pack ships **33 entity types**. Two are validated in code rather than
-trusted from a regex, IP addresses via the stdlib `ipaddress` module, and credit
-cards via the Luhn checksum, and several FP-prone patterns are deliberately scored
-low and only cross the threshold when supporting context words are nearby.
-
-- **Network identifiers:** `INTERNAL_IP`, `PUBLIC_IP` (IPv4 + IPv6, validated),
-  `MAC_ADDRESS`, `HOSTNAME`
-- **Cloud / provider keys:** `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, `AWS_ACCOUNT_ID`,
-  `GOOGLE_API_KEY`, `STRIPE_KEY`, `OPENAI_KEY`, `OPENROUTER_KEY`,
-  `FCM_SERVER_KEY`, `SENDGRID_KEY`, `TWILIO_SID`
-- **Source-control / package tokens:** `GITHUB_TOKEN`, `GITLAB_TOKEN`,
-  `NPM_TOKEN`, `SHOPIFY_TOKEN`
-- **Chat tokens & webhooks:** `SLACK_TOKEN`, `SLACK_WEBHOOK`, `DISCORD_TOKEN`,
-  `DISCORD_WEBHOOK`, `TELEGRAM_BOT_TOKEN`
-- **Auth tokens / generic secrets:** `JWT`, `BEARER_TOKEN`, `GENERIC_API_KEY`
-- **Crypto / connection strings:** `PRIVATE_KEY_BLOCK` (PEM), `SSH_PUBLIC_KEY`,
-  `DB_CONNECTION_STRING`, `URL_WITH_CREDENTIALS`
-- **PII:** `EMAIL_ADDRESS`, `CREDIT_CARD` (Luhn-validated)
-- **Filesystem:** `UNIX_HOME_PATH` (username leak)
-
-The live list is always available from the API (`GET /entities`) or
-`Scrubber().entities()`. You can also add your own regex recognisers at runtime
-from the review UI (see below), they run alongside the built-in pack.
+> For what Scrub is and why it exists, see the [project README](../README.md). For the
+> review front end, see [`ui/README.md`](../ui/README.md). This file does not repeat the
+> overview, it covers the engine specifics only.
 
 ---
 
@@ -58,9 +16,16 @@ from the review UI (see below), they run alongside the built-in pack.
 pip install -e .
 ```
 
-This puts a `scrub` command on your PATH. The only runtime dependency for the CLI
-is `presidio-analyzer`; the API service and full-Presidio mode are optional extras
-(`pip install -e ".[api]"`, and a spaCy model for full mode).
+This puts a `scrub` command on your PATH. The CLI's only runtime dependencies are
+`presidio-analyzer` and `click`. Everything else is an optional extra:
+
+- `pip install -e ".[api]"` adds the API service (FastAPI + uvicorn) the review UI uses.
+- `pip install -e ".[dev]"` adds the test runner (pytest).
+- The full-Presidio mode additionally needs a spaCy model (see [below](#optional-full-presidio-mode)).
+
+The names in brackets are literal pip "extras" defined in
+[`pyproject.toml`](../pyproject.toml), type them as-is; combine them with
+`pip install -e ".[api,dev]"`.
 
 ---
 
@@ -101,59 +66,55 @@ The contract that keeps it pipeable and safe:
 - `--check` and every report **mask** each value, so secrets never hit your
   scrollback or CI logs.
 
----
-
-## Git pre-commit hook
-
-`--check` is designed to drop into a git pre-commit hook so secrets are caught
-before they are committed. A ready-made hook and installers live in
-[`hooks/`](../hooks/):
-
-```bash
-hooks/install.sh        # bash / macOS / Linux
-hooks/install.ps1       # Windows PowerShell
-```
-
-The hook blocks a commit (exit 1) on any high-confidence finding and prints a
-masked report; sub-threshold near-misses are noted without blocking.
+`--check`'s non-zero exit on a finding is exactly what the git pre-commit hook relies on,
+see the [hook section in the project README](../README.md#git-pre-commit-hook).
 
 ---
 
-## The review UI
+## The local API
 
-A local web UI (Next.js) for the paste → review → export flow:
-
-```bash
-cd ui
-npm install
-npm run dev   # http://localhost:3000
-```
-
-It talks only to the local API (`http://127.0.0.1:8000`); start that with:
+The engine ships a localhost FastAPI service (this is what the review UI talks to).
+Install the API extra (`pip install -e ".[api]"`), then run it **from `scrub/`**:
 
 ```bash
 cd scrub
 uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-What the UI gives you:
+> Run `uvicorn` from inside `scrub/`, the service imports its sibling modules flat, so
+> the command won't resolve from the repo root.
 
-- **Paste or load files:** drag-and-drop or pick multiple files; each opens in its
-  own tab. Files are read in the browser; only the text reaches the localhost API.
-- **Review with line numbers:** the scrubbed output is line-numbered; click a
-  detection to scroll to and highlight that line. A gutter "minimap" shows where in
-  the artefact data was scrubbed.
-- **Diff view:** toggle to see the original (with highlights) beside the scrubbed
-  output.
-- **Per-detection control:** keep/dismiss individual detections, filter/search the
-  list, and move a confidence-threshold slider; the export updates instantly.
-- **Custom recognisers:** add your own regex patterns at runtime (in memory only).
-- **Restore round-trip:** reconstruct the original from the in-memory mapping to
-  confirm the scrub is reversible.
+Endpoints (all localhost-only, no external calls in the scrub path):
 
-API endpoints (all localhost-only): `POST /scrub`, `POST /restore`,
-`GET /entities`, `GET /health`, and `GET/POST/DELETE /recognizers` for the custom
-recogniser set.
+| Method + path | Purpose |
+| --- | --- |
+| `POST /scrub` | `{text}` → `{scrubbed, mapping, detections}` |
+| `POST /restore` | `{text, mapping}` → `{original}` |
+| `GET /entities` | the entity types the pack can produce |
+| `GET /recognizers` | list the in-memory custom recognisers |
+| `POST /recognizers` | register a custom regex recogniser (400 on a bad pattern) |
+| `DELETE /recognizers/{entity}` | remove one by entity token (404 if unknown) |
+| `GET /health` | `{status, mode}` (`custom-only` or `full`) |
+
+CORS is locked to `http://localhost:3000` / `http://127.0.0.1:3000` only. To launch the
+full UI on top of this API, see the
+[project quickstart](../README.md#get-started-the-review-ui).
+
+---
+
+## What it detects
+
+The pack ships **33 entity types** across network identifiers, cloud/provider keys,
+source-control and chat tokens, auth tokens, crypto and connection strings, and a little
+PII; the [full per-type list is in the project README](../README.md#what-it-detects). Two
+types are validated in code rather than trusted to a regex: IP addresses (via the stdlib
+`ipaddress` module) and credit cards (via the Luhn checksum). Several false-positive-prone
+patterns are scored low on purpose and only cross the threshold when supporting context
+words are nearby.
+
+At runtime the live list comes from `GET /entities` or `Scrubber().entities()`, and you
+can register your own regex recognisers (`add_custom_recognizer`, or the `/recognizers`
+endpoints) to run alongside the built-in pack.
 
 ---
 
@@ -163,8 +124,8 @@ recogniser set.
   the same placeholder, so the scrubbed artefact still reads as a coherent trace;
   the kept mapping reconstructs the original byte-for-byte.
 - **Context-aware scoring.** In the default (custom-pack-only, no-spaCy) mode, a
-  lightweight character-window check raises a detection's score when the
-  recogniser's context words are nearby, so a real AWS secret next to
+  lightweight character-window check (`context_enhancer.py`) raises a detection's score
+  when the recogniser's context words are nearby, so a real AWS secret next to
   `aws_secret_access_key` clears the threshold while a bare 40-char blob does not.
 - **Validated, not just matched.** IPs and credit-card numbers are validated in
   code (stdlib `ipaddress`, Luhn) rather than trusted from a regex.
@@ -200,28 +161,16 @@ silently degrades.
   class, and holds any runtime custom recognisers.
 - **`context_enhancer.py`:** spaCy-free context scoring for custom-only mode.
 - **`cli.py`:** the command-line interface.
-- **`main.py`:** the localhost API used by the review UI.
-- **`../ui/`:** the Next.js review UI.
-
----
-
-## Known limitations
-
-- Detection is **pattern + context based**, not semantic. Novel, obfuscated, or
-  malformed secrets may not match, by design, the pack favours precision on the
-  high-confidence patterns and leans on context for the ambiguous ones.
-- At low thresholds, bare values can be mislabelled (the long tail favours recall);
-  raise `--threshold`, or use the review step, to tighten this.
-- The pack is **not exhaustive:** it targets the identifiers that actually leak in
-  security/infra work, not every possible secret format.
-- **Review before export is the safety net.** Scrub surfaces what it found (and what
-  it nearly found); a human still decides what is safe to share.
+- **`main.py`:** the localhost API.
 
 ---
 
 ## Testing
 
+Install the test extra (adds pytest), then run the suite from this folder:
+
 ```bash
+pip install -e ".[dev]"
 pytest
 ```
 
@@ -229,9 +178,9 @@ pytest
 
 ## License
 
-MIT
+MIT. See [`../LICENSE`](../LICENSE).
 
 ---
 
-*This README reflects scrub v0.3.0. The detected-entity list and CLI flags are the
-two things most likely to drift; keep this section honest as recognisers are added.*
+*The detected-entity list and CLI flags are the two things most likely to drift from the
+code; keep them honest as recognisers are added.*

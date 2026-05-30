@@ -80,7 +80,7 @@ export function RecognizerPanel({ onChanged }: RecognizerPanelProps) {
   }
 
   return (
-    <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-panel)]">
+    <section className="rounded-md border border-[var(--color-border)] bg-[var(--color-panel)]">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between px-4 py-2.5 text-left"
@@ -142,14 +142,14 @@ export function RecognizerPanel({ onChanged }: RecognizerPanelProps) {
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               placeholder="Name, e.g. Employee ID"
-              className="rounded border border-[var(--color-border-strong)] bg-transparent px-2 py-1 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-faint)] focus:border-[var(--color-accent)] focus:outline-none"
+              className="rounded border border-[var(--color-border-strong)] bg-transparent px-2 py-1 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-faint)] focus-visible:border-[var(--color-ink)] focus-visible:outline-none"
             />
             <input
               type="text"
               value={context}
               onChange={(e) => setContext(e.target.value)}
               placeholder="Context words (comma-separated, optional)"
-              className="rounded border border-[var(--color-border-strong)] bg-transparent px-2 py-1 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-faint)] focus:border-[var(--color-accent)] focus:outline-none"
+              className="rounded border border-[var(--color-border-strong)] bg-transparent px-2 py-1 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-faint)] focus-visible:border-[var(--color-ink)] focus-visible:outline-none"
             />
           </div>
           <input
@@ -158,7 +158,7 @@ export function RecognizerPanel({ onChanged }: RecognizerPanelProps) {
             onChange={(e) => setRegex(e.target.value)}
             placeholder="Pattern, e.g. EMP-\d{5}"
             spellCheck={false}
-            className="mono w-full rounded border border-[var(--color-border-strong)] bg-transparent px-2 py-1 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-faint)] focus:border-[var(--color-accent)] focus:outline-none"
+            className="mono w-full rounded border border-[var(--color-border-strong)] bg-transparent px-2 py-1 text-xs text-[var(--color-ink)] placeholder:text-[var(--color-faint)] focus-visible:border-[var(--color-ink)] focus-visible:outline-none"
           />
           <div className="flex items-center gap-3">
             <label className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
@@ -177,7 +177,7 @@ export function RecognizerPanel({ onChanged }: RecognizerPanelProps) {
             <button
               onClick={add}
               disabled={busy}
-              className="ml-auto rounded-md border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] transition-colors hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+              className="ml-auto rounded border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] transition-colors hover:border-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {busy ? "Saving..." : "Add recogniser"}
             </button>

@@ -116,23 +116,20 @@ export function ReviewPane({
   }
 
   return (
-    <section className="flex h-full min-h-0 flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-panel)]">
-      <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
+    <section className="flex h-full min-h-0 flex-col rounded-md border border-[var(--color-border)] bg-[var(--color-panel)]">
+      <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
         <div className="flex items-baseline gap-2">
           <h2 className="text-sm font-semibold tracking-wide text-[var(--color-ink)]">
             {diff ? "Scrubbed" : "Review"}
           </h2>
-          <span className="text-xs text-[var(--color-faint)]">
-            chips are scrubbed, amber is exposed
-          </span>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={onToggleDiff}
             disabled={!hasScrubbed}
-            className={`rounded-md border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            className={`rounded border px-3 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
               diff
-                ? "border-[var(--color-accent)] text-[var(--color-ink)]"
+                ? "border-[var(--color-ink)] text-[var(--color-ink)]"
                 : "border-[var(--color-border-strong)] text-[var(--color-muted)] hover:text-[var(--color-ink)]"
             }`}
             title="Show the original alongside the scrubbed output"
@@ -142,14 +139,14 @@ export function ReviewPane({
           <button
             onClick={copy}
             disabled={!hasScrubbed}
-            className="rounded-md border border-[var(--color-border-strong)] px-3 py-1 text-xs font-medium text-[var(--color-ink)] transition-colors hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded border border-[var(--color-border-strong)] px-3 py-1 text-xs font-medium text-[var(--color-ink)] transition-colors hover:border-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {copied ? "Copied" : "Copy"}
           </button>
           <button
             onClick={download}
             disabled={!hasScrubbed}
-            className="rounded-md border border-[var(--color-border-strong)] px-3 py-1 text-xs font-medium text-[var(--color-muted)] transition-colors hover:border-[var(--color-border-strong)] hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded border border-[var(--color-border-strong)] px-3 py-1 text-xs font-medium text-[var(--color-muted)] transition-colors hover:border-[var(--color-border-strong)] hover:text-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             .txt
           </button>
@@ -173,7 +170,7 @@ export function ReviewPane({
 
       {hasScrubbed && (
         <footer className="border-t border-[var(--color-border)] px-4 py-2.5">
-          <p className="text-xs text-[var(--color-muted)]">
+          <p className="tnum text-xs text-[var(--color-muted)]">
             <span className="font-medium text-[var(--color-ink)]">
               {applied} of {total}
             </span>{" "}

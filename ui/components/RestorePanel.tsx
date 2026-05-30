@@ -33,7 +33,7 @@ export function RestorePanel({ mapping, exportText }: RestorePanelProps) {
   }
 
   return (
-    <section className="rounded-lg border border-[var(--color-border)] bg-[var(--color-panel)]">
+    <section className="rounded-md border border-[var(--color-border)] bg-[var(--color-panel)]">
       <button
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between px-4 py-2.5 text-left"
@@ -59,7 +59,7 @@ export function RestorePanel({ mapping, exportText }: RestorePanelProps) {
           <button
             onClick={run}
             disabled={!hasMapping || busy}
-            className="rounded-md border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] transition-colors hover:border-[var(--color-accent)] disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded border border-[var(--color-border-strong)] px-3 py-1.5 text-xs font-medium text-[var(--color-ink)] transition-colors hover:border-[var(--color-ink)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {busy ? "Restoring..." : "Restore from current output"}
           </button>

@@ -80,7 +80,7 @@ export function InputPane({
 
   return (
     <section
-      className="relative flex h-full min-h-0 flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-panel)]"
+      className="relative flex h-full min-h-0 flex-col rounded-md border border-[var(--color-border)] bg-[var(--color-panel)]"
       onDragOver={(e) => {
         e.preventDefault();
         if (!dragging) setDragging(true);
@@ -91,25 +91,22 @@ export function InputPane({
       }}
       onDrop={onDrop}
     >
-      <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2.5">
+      <header className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-2">
         <div className="flex items-baseline gap-2">
           <h2 className="text-sm font-semibold tracking-wide text-[var(--color-ink)]">
             Input
           </h2>
-          <span className="text-xs text-[var(--color-faint)]">
-            paste, or drop files
-          </span>
         </div>
         <div className="flex items-center gap-3">
           <button
             onClick={onLoadSample}
-            className="rounded-md border border-[var(--color-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
+            className="rounded border border-[var(--color-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
           >
             Load sample
           </button>
           <button
             onClick={() => fileInput.current?.click()}
-            className="rounded-md border border-[var(--color-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
+            className="rounded border border-[var(--color-border-strong)] px-2.5 py-1 text-xs font-medium text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
           >
             Upload files
           </button>
@@ -139,7 +136,7 @@ export function InputPane({
         <button
           onClick={onScrub}
           disabled={loading || value.length === 0}
-          className="rounded-md bg-[var(--color-accent)] px-4 py-1.5 text-sm font-semibold text-[#04222a] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded bg-[var(--color-ink)] px-4 py-1.5 text-sm font-semibold text-[var(--color-bg)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading ? "Scrubbing..." : "Scrub"}
         </button>
@@ -155,8 +152,8 @@ export function InputPane({
       </footer>
 
       {dragging && (
-        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-[var(--color-accent)] bg-[var(--color-bg)]/70">
-          <span className="text-sm font-medium text-[var(--color-accent)]">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md border-2 border-dashed border-[var(--color-ink)] bg-[var(--color-bg)]/70">
+          <span className="text-sm font-medium text-[var(--color-ink)]">
             Drop files to load
           </span>
         </div>

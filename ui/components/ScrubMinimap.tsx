@@ -26,7 +26,7 @@ export function ScrubMinimap({ marks, totalLines, onJump }: ScrubMinimapProps) {
           <button
             key={`${m.placeholder}-${i}`}
             onClick={() => onJump?.(m.line)}
-            className="absolute left-0 right-0 h-[3px] -translate-y-1/2 cursor-pointer transition-transform hover:scale-x-150"
+            className="absolute left-0 right-0 h-[3px] -translate-y-1/2 cursor-pointer opacity-80 transition-opacity hover:opacity-100"
             style={{ top: `${top}%`, backgroundColor: entityColor(m.entity) }}
             title={m.placeholder}
             aria-label={`Go to ${m.placeholder}`}
